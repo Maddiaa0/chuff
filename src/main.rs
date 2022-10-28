@@ -17,6 +17,11 @@ enum Token {
     /// Represents a Jump Label
     JumpLabel(String),
 
+    MacroInvocation {
+        name: String,
+        args: Vec<String>,
+    },
+
     Macro {
         name: String,
         takes: u32,
@@ -109,8 +114,23 @@ fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let newline = lex_newline_and_comments();
     let opcode = lex_opcode_or_jump_label();
     let hex_literal = lex_hex_number();
+    let macro_invocation = lex_macro_invocation();
 
-    opcode.or(hex_literal).or(newline.clone()).repeated()
+    macro_invocation
+        .or(opcode)
+        .or(hex_literal)
+        .or(newline.clone())
+        .repeated()
+}
+
+fn lex_macro_invocation() -> impl Parser<char, Token, Error = Simple<char>> {
+    let ident = text::ident();
+
+    ident
+        .then_ignore(just('('))
+        // TODO: args delimited by comma
+        .then_ignore(just(')'))
+        .map(|name| Token::MacroInvocation { name, args: vec![] })
 }
 
 fn lex_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {
