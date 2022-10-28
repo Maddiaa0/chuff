@@ -1,4 +1,8 @@
-use chumsky::{error::Cheap, prelude::*};
+use chumsky::{
+    error::Cheap,
+    prelude::*,
+    text::{whitespace, TextParser},
+};
 use chumsky_huff::opcodes::{Opcode, OPCODES, OPCODES_MAP};
 
 #[derive(Debug, Clone)]
@@ -35,7 +39,16 @@ enum Token {
 // Create a token mapping of keyword to opcode
 
 fn parser() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    lex_macro().repeated()
+    let program = lex_program();
+
+    program.then_ignore(end())
+}
+
+fn lex_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+    let macro_lexer = lex_macro();
+    let newline = lex_newline_and_comments();
+
+    macro_lexer.or(newline).repeated()
 }
 
 /// Lex Macro
@@ -88,8 +101,8 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
                 body: macros,
             }
         })
-        .padded()
         .labelled("macro_body")
+        .padded()
 }
 
 fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
@@ -97,12 +110,7 @@ fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let opcode = lex_opcode_or_jump_label();
     let hex_literal = lex_hex_number();
 
-    opcode
-        .or(hex_literal)
-        .or(newline.clone())
-        // TODO: come up with better error handling strategies
-        .recover_with(skip_then_retry_until([' ']))
-        .repeated()
+    opcode.or(hex_literal).or(newline.clone()).repeated()
 }
 
 fn lex_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {
