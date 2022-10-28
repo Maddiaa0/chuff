@@ -1,0 +1,3 @@
+#define macro test = takes() returns(0) {
+    add sub // here
+}
