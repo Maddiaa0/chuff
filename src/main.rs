@@ -53,7 +53,11 @@ fn lex_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let macro_lexer = lex_macro();
     let newline = lex_newline_and_comments();
 
-    macro_lexer.or(newline).repeated()
+    macro_lexer
+        .or(newline)
+        // TODO: recover to the next # for a macro definition
+        // .recover_with(strategy)
+        .repeated()
 }
 
 /// Lex Macro
@@ -109,6 +113,18 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         .labelled("macro_body")
         .padded()
 }
+
+/// Constant Lexer
+///
+/// Find constants in the program, they are defined as
+/// `#define constant <name> = <value>`
+/// where value can either be FREE_STORAGE_POINTER() or a hex literal
+fn lex_constant() -> impl Parser<char, Token, Error = Simple<char>> {}
+
+/// Free storage pointer lexer
+///
+/// Match against `FREE_STORAGE_POINTER()`
+fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {}
 
 fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let newline = lex_newline_and_comments();
