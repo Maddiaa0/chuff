@@ -17,6 +17,15 @@ enum Token {
     /// Represents a Jump Label
     JumpLabel(String),
 
+    /// Represents a free storage pointer keyword
+    FreeStoragePointer,
+
+    /// A constant declaration
+    Constant {
+        name: String,
+        value: Box<Token>,
+    },
+
     MacroInvocation {
         name: String,
         args: Vec<String>,
@@ -52,9 +61,11 @@ fn parser() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
 fn lex_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let macro_lexer = lex_macro();
     let newline = lex_newline_and_comments();
+    let constant = lex_constant();
 
     macro_lexer
         .or(newline)
+        .or(constant)
         // TODO: recover to the next # for a macro definition
         // .recover_with(strategy)
         .repeated()
@@ -119,12 +130,52 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
 /// Find constants in the program, they are defined as
 /// `#define constant <name> = <value>`
 /// where value can either be FREE_STORAGE_POINTER() or a hex literal
-fn lex_constant() -> impl Parser<char, Token, Error = Simple<char>> {}
+fn lex_constant() -> impl Parser<char, Token, Error = Simple<char>> {
+    let hex_literal = lex_hex_number();
+    let free_storage_pointer = lex_free_storage_pointer();
+    let define = lex_define();
+    let key = |c| text::keyword(c).padded();
+    let ident = text::ident().padded();
+    let constant_name = ident;
+    let equals = just('=').padded();
+
+    let valid_constant_body = hex_literal
+        .or(free_storage_pointer)
+        .labelled("valid_constant_body");
+
+    define
+        .ignore_then(key("constant"))
+        .ignore_then(constant_name)
+        .then_ignore(equals)
+        .then(valid_constant_body)
+        .map(|(name, value)| Token::Constant {
+            name: name,
+            value: Box::from(value),
+        })
+}
 
 /// Free storage pointer lexer
 ///
 /// Match against `FREE_STORAGE_POINTER()`
-fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {}
+fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
+    // TODO: prevent repetition of these building blocks
+    let key = |c| text::keyword(c).padded();
+
+    key("FREE")
+        .then_ignore(just('_'))
+        .then_ignore(key("STORAGE"))
+        .then_ignore(just('_'))
+        .then_ignore(key("POINTER"))
+        .then_ignore(just('('))
+        .then_ignore(just(')'))
+        .map(|_| Token::FreeStoragePointer)
+}
+
+fn lex_define() -> impl Parser<char, (), Error = Simple<char>> {
+    let key = |c| text::keyword(c).padded();
+
+    just('#').then(key("define")).to(()).labelled("define")
+}
 
 fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let newline = lex_newline_and_comments();
