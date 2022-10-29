@@ -33,6 +33,7 @@ enum Token {
 
     Macro {
         name: String,
+        r#type: MacroType,
         takes: u32,
         returns: u32,
         args: Vec<String>,
@@ -42,6 +43,12 @@ enum Token {
     Newline,
 
     Error,
+}
+
+#[derive(Debug, Clone)]
+enum MacroType {
+    Function,
+    Macro,
 }
 
 /// Error strategies
@@ -91,11 +98,12 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
 
     // Other lexers
     let macro_body = lex_macro_body();
+    let macro_type = lex_macro_type();
 
     just('#')
         .ignore_then(key("define"))
-        .ignore_then(key("macro"))
-        .ignore_then(ident)
+        .ignore_then(macro_type)
+        .then(ident)
         .then_ignore(char('='))
         // TODO: turn takes into its own lex so the whole thing can be if or
         .then_ignore(key("takes"))
@@ -110,11 +118,12 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         .then_ignore(char('{'))
         .then(macro_body)
         .then_ignore(char('}'))
-        .map(|(((name, takes), returns), macros)| {
+        .map(|((((macro_type, name), takes), returns), macros)| {
             // println!("{name} {:?}", name = name, takes);
             Token::Macro {
                 name: name,
                 // TODO: clean up this line
+                r#type: macro_type,
                 takes: takes.unwrap_or(0.to_string()).parse().unwrap(),
                 returns: returns.unwrap_or(0.to_string()).parse().unwrap(),
                 args: vec![],
@@ -123,6 +132,14 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         })
         .labelled("macro_body")
         .padded()
+}
+
+fn lex_macro_type() -> impl Parser<char, MacroType, Error = Simple<char>> {
+    let key = |c| text::keyword(c).padded();
+
+    key("fn")
+        .map(|_| MacroType::Function)
+        .or(key("macro").map(|_| MacroType::Macro))
 }
 
 /// Constant Lexer
