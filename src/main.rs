@@ -1,9 +1,15 @@
+// TOOD: look in ast.rs of huff-rs and rip the types so that they can
+// be identical to the ones in the huff-rs crate
+
 use chumsky::{
     error::Cheap,
     prelude::*,
     text::{whitespace, TextParser},
 };
-use chumsky_huff::opcodes::{Opcode, OPCODES, OPCODES_MAP};
+use chumsky_huff::{
+    builtins::{BuiltinFunctionKind, BUILTINS, BUILTINS_MAP},
+    opcodes::{Opcode, OPCODES, OPCODES_MAP},
+};
 
 #[derive(Debug, Clone)]
 enum Token {
@@ -16,6 +22,9 @@ enum Token {
 
     /// Represents a Jump Label
     JumpLabel(String),
+
+    /// Represents a builtin function
+    BuiltinFunctionKind(BuiltinFunctionKind),
 
     /// Represents a free storage pointer keyword
     FreeStoragePointer,
@@ -104,6 +113,9 @@ fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         .ignore_then(key("define"))
         .ignore_then(macro_type)
         .then(ident)
+        .then_ignore(char('('))
+        // TODO: Parse the macro arguments
+        .then_ignore(char(')'))
         .then_ignore(char('='))
         // TODO: turn takes into its own lex so the whole thing can be if or
         .then_ignore(key("takes"))
@@ -199,8 +211,10 @@ fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let opcode = lex_opcode_or_jump_label();
     let hex_literal = lex_hex_number();
     let macro_invocation = lex_macro_invocation();
+    let builtin_fn = lex_builtin_fn();
 
-    macro_invocation
+    builtin_fn
+        .or(macro_invocation)
         .or(opcode)
         .or(hex_literal)
         .or(newline.clone())
@@ -215,6 +229,24 @@ fn lex_macro_invocation() -> impl Parser<char, Token, Error = Simple<char>> {
         // TODO: args delimited by comma
         .then_ignore(just(')'))
         .map(|name| Token::MacroInvocation { name, args: vec![] })
+        .labelled("macro_invocation")
+}
+
+/// Lex Builtin function invocations
+fn lex_builtin_fn() -> impl Parser<char, Token, Error = Simple<char>> {
+    text::ident()
+        .then_ignore(just('('))
+        // TODO: parse args
+        .then_ignore(just(')'))
+        .map(|ident: String| {
+            BUILTINS_MAP
+                .get(&ident)
+                .map(|builtin| Token::BuiltinFunctionKind(builtin.clone()))
+                // TODO: this line came from copilot im not to confident in it
+                .unwrap_or_else(|| Token::JumpLabel(ident))
+        })
+        .padded()
+        .labelled("builtin_fn_invocation")
 }
 
 fn lex_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {

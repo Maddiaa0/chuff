@@ -11,4 +11,6 @@ Mard is a huff parser build with [chumsky]("https://github.com/zesterer/chumsky"
 
 ## Why
 
-This software is being written to start the effort in creating a functional [lsp]("https://microsoft.github.io/language-server-protocol/") for huff. Huff is a _hard_ language to learn and get on top of as there are so many footguns. Creating an LSP aims to provide feedback to people learning that will reduce the pain of these footguns.
+### lsp
+
+This software is being written to start the effort in creating a functional [lsp]("https://microsoft.github.io/language-server-protocol/") for huff. Huff is a _hard_ language to learn as there are so many footguns. Creating an LSP aims to provide feedback to people learning that will reduce the pain of these footguns.
