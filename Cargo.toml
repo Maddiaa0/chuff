@@ -9,6 +9,9 @@ edition = "2021"
 chumsky = "0.8"
 phf = { version = "0.11", features = ["macros"] }
 itertools = "0.10.5"
+serde = { version = "1.0.137", features = [ "derive", "rc" ]}
+serde_json = "1.0.81"
+ariadne = "0.1.5"
 
 [lib]
 path = "src/lib.rs"
