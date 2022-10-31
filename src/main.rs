@@ -4,14 +4,7 @@
 use chumsky::{prelude::*, Stream};
 use chumsky_huff::{
     lexer::{lexer, token::Token},
-    parser::{
-        constants::parse_constant, macros::parse_macro, parser, utils::parse_newline_and_comments,
-    },
-    utils::{
-        abi::{Constructor, Error, Event, Function},
-        builtins::{BuiltinFunctionKind, BUILTINS_MAP},
-        opcodes::{Opcode, OPCODES_MAP},
-    },
+    parser::parser,
 };
 
 /// Error strategies

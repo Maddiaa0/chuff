@@ -1,6 +1,7 @@
 pub mod token;
+pub mod utils;
 
-use self::token::Token;
+use self::{token::Token, utils::key};
 use chumsky::prelude::*;
 
 use crate::{
