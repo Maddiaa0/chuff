@@ -2,6 +2,7 @@ use chumsky::prelude::*;
 
 use crate::{
     parser::{abi, utils::key},
+    span::Spanned,
     utils::{
         opcodes::{Opcode, OPCODES_MAP},
         types::PrimitiveEVMType,
@@ -124,7 +125,7 @@ pub enum Token {
     Unknown(String),
 }
 
-pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let other_whitespace = lex_non_newline_whitespace();
     let newline = lex_newline_and_comments();
 
@@ -133,6 +134,7 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let operators = lex_operators();
     let evm_type = lex_evm_type();
     let builtin_function = lex_builtin_function();
+    let string = lex_string(); // Only relevant to file imports
 
     let opcode_or_ident = lex_opcode();
 
@@ -144,20 +146,30 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let token = define
         .or(evm_type)
         .or(include)
+        .or(string)
         .or(builtin_function)
         .or(operators)
         .or(opcode_or_ident)
         .or(number)
-        .or(newline.clone());
+        .or(newline.clone())
+        // Skip invalid characters
+        .recover_with(skip_then_retry_until([]));
 
-    // Parse tokens attaching TODO: spans
     let tokens = token
-        .map(|tok| tok)
+        .map_with_span(|tok, span| (tok, span))
         .padded_by(other_whitespace.repeated())
-        .repeated();
+        .repeated() // make sure there's a newline at the end of input
+        .chain(
+            newline
+                .clone()
+                // if there isn't a newline at the end of input, just insert a fake newline token
+                .or(end().rewind().to(Token::Newline))
+                // make sure to attach a span! this might be incorrect for the fake newlines
+                .map_with_span(|tok, span| (tok, span)),
+        )
+        .then_ignore(end());
 
-    // newline.clone().ignore_then(
-    tokens
+    newline.clone().ignore_then(tokens)
 }
 
 pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -211,6 +223,43 @@ pub fn lex_bytes() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> 
             Some(x) => PrimitiveEVMType::Bytes(x.parse().unwrap()),
             None => PrimitiveEVMType::DynBytes,
         })
+}
+
+/// Lexes a string. Currently, there is no way to escape quotes inside of strings.
+fn lex_string() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
+    let escape = just('\\')
+        .ignore_then(
+            just('\\')
+                .or(just('/'))
+                .or(just('"'))
+                .or(just('b').to('\x08'))
+                .or(just('f').to('\x0C'))
+                .or(just('n').to('\n'))
+                .or(just('r').to('\r'))
+                .or(just('t').to('\t'))
+                .or(just('u').ignore_then(
+                    // unicode UTF-32 escapes
+                    filter(|c: &char| c.is_ascii_hexdigit())
+                        .repeated()
+                        .exactly(4)
+                        .collect::<String>()
+                        .validate(|digits, span, emit| {
+                            char::from_u32(u32::from_str_radix(&digits, 16).unwrap())
+                                .unwrap_or_else(|| {
+                                    emit(Simple::custom(span, "Invalid unicode character"));
+                                    '\u{FFFD}' // unicode replacement character
+                                })
+                        }),
+                )),
+        )
+        .labelled("string escape character");
+
+    just('"')
+        .ignore_then(filter(|c| *c != '\\' && *c != '"').or(escape).repeated())
+        .then_ignore(just('"'))
+        .collect::<String>()
+        .map(Token::Str)
+        .labelled("string")
 }
 
 pub fn lex_uint() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {

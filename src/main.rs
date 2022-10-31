@@ -47,7 +47,7 @@ fn main() {
     let src = std::fs::read_to_string(file_path).unwrap();
 
     // .parse_recovery(src).
-    let lexer = lexer().parse(src);
+    let lexer = lexer().parse_recovery(src);
     println!("{lexer:?}")
     // let debug = parser().parse_recovery_verbose(src);
     // println!("{:?}", debug);
