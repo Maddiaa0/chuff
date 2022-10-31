@@ -5,7 +5,7 @@ use regex::Regex;
 use std::{fmt, str::FromStr};
 
 /// Primitive EVM types
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PrimitiveEVMType {
     /// String type
     String,

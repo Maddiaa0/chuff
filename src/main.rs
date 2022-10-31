@@ -1,12 +1,11 @@
 // TOOD: look in ast.rs of huff-rs and rip the types so that they can
 // be identical to the ones in the huff-rs crate
 
-use chumsky::prelude::*;
+use chumsky::{prelude::*, Stream};
 use chumsky_huff::{
-    lexer::lexer,
+    lexer::{lexer, token::Token},
     parser::{
-        constants::parse_constant, macros::parse_macro, token::Token,
-        utils::parse_newline_and_comments,
+        constants::parse_constant, macros::parse_macro, parser, utils::parse_newline_and_comments,
     },
     utils::{
         abi::{Constructor, Error, Event, Function},
@@ -23,32 +22,34 @@ use chumsky_huff::{
 
 // Create a token mapping of keyword to opcode
 
-fn parser() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    let program = parse_program();
-
-    program.then_ignore(end())
-}
-
-fn parse_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    let macro_parseer = parse_macro();
-    let newline = parse_newline_and_comments();
-    let constant = parse_constant();
-
-    macro_parseer
-        .or(newline)
-        .or(constant)
-        // Naive strategy ignores unexpected definitions
-        .recover_with(skip_then_retry_until(['#']))
-        .repeated()
-}
-
-fn main() {
+fn main() -> Result<(), String> {
     let file_path = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file_path).unwrap();
+    let src_len = src.chars().count();
 
     // .parse_recovery(src).
-    let lexer = lexer().parse_recovery(src);
-    println!("{lexer:?}")
+    let (tokens, lex_errors) = lexer().parse_recovery(src);
+    println!("TOKENS");
+    println!("{tokens:?}");
+
+    // TODO: remove newlines from the tokens
+
+    let (ast, parse_errs) = if let Some(tokens) = tokens {
+        let clean_tokens = tokens
+            .into_iter()
+            .filter(|(token, _)| token.clone() != Token::Newline);
+        let token_stream = Stream::from_iter(src_len..src_len + 1, clean_tokens.into_iter());
+        parser().parse_recovery(token_stream)
+    } else {
+        (None, vec![])
+    };
+    println!("AST");
+    println!("{ast:?}");
+
+    println!("ERRS");
+    println!("{parse_errs:?}");
     // let debug = parser().parse_recovery_verbose(src);
     // println!("{:?}", debug);
+
+    Ok(())
 }
