@@ -1,6 +1,6 @@
 # Mard!
 
-> `Mard` is a huff-language parser with a focus on error recovery at the lexing stages. It's purpose is to produce a partial AST that can be used to grant rich error feedback.
+> `Mard` is a huff-language parser with a focus on error recovery at the parseing stages. It's purpose is to produce a partial AST that can be used to grant rich error feedback.
 
 > **Warning**
 > Mard is currently under active development and is not suited for production use. Go for it, but it probably won't do what you want it to.

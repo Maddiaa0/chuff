@@ -58,7 +58,7 @@ impl From<String> for BuiltinFunctionKind {
             "__CODECOPY_DYN_ARG" => BuiltinFunctionKind::DynConstructorArg,
             _ => panic!("Invalid Builtin Function Kind"), /* This should never be reached,
                                                            * builtins are validated with a
-                                                           * `try_from` call in the lexer. */
+                                                           * `try_from` call in the parseer. */
         }
     }
 }

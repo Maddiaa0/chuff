@@ -4,10 +4,10 @@ use crate::utils::{builtins::BUILTINS_MAP, opcodes::OPCODES_MAP};
 
 use super::{
     token::{MacroType, Token},
-    utils::lex_newline_and_comments,
+    utils::parse_newline_and_comments,
 };
 
-/// Lex Macro
+/// parse Macro
 ///
 /// Steps:
 ///     1. Find `#define` keyword
@@ -19,15 +19,15 @@ use super::{
 ///     7. Find the macro body
 ///
 /// TODO: right now do not allow nested macros, that will come later
-pub fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn parse_macro() -> impl Parser<char, Token, Error = Simple<char>> {
     // Pad keyword finders
     let ident = text::ident().padded();
     let key = |c| text::keyword(c).padded();
     let char = |c| just(c).padded();
 
-    // Other lexers
-    let macro_body = lex_macro_body();
-    let macro_type = lex_macro_type();
+    // Other parseers
+    let macro_body = parse_macro_body();
+    let macro_type = parse_macro_type();
 
     just('#')
         .ignore_then(key("define"))
@@ -37,12 +37,12 @@ pub fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         // TODO: Parse the macro arguments
         .then_ignore(char(')'))
         .then_ignore(char('='))
-        // TODO: turn takes into its own lex so the whole thing can be if or
+        // TODO: turn takes into its own parse so the whole thing can be if or
         .then_ignore(key("takes"))
         .then_ignore(char('('))
         .then(text::digits(10).or_not())
         .then_ignore(char(')'))
-        // TODO: turn returns into its own lex so the whole thing can be if or
+        // TODO: turn returns into its own parse so the whole thing can be if or
         .then_ignore(key("returns"))
         .then_ignore(char('('))
         .then(text::digits(10).or_not())
@@ -66,7 +66,7 @@ pub fn lex_macro() -> impl Parser<char, Token, Error = Simple<char>> {
         .padded()
 }
 
-fn lex_macro_type() -> impl Parser<char, MacroType, Error = Simple<char>> {
+fn parse_macro_type() -> impl Parser<char, MacroType, Error = Simple<char>> {
     let key = |c| text::keyword(c).padded();
 
     key("fn")
@@ -74,12 +74,12 @@ fn lex_macro_type() -> impl Parser<char, MacroType, Error = Simple<char>> {
         .or(key("macro").map(|_| MacroType::Macro))
 }
 
-pub fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    let newline = lex_newline_and_comments();
-    let opcode = lex_opcode_or_jump_label();
-    let hex_literal = lex_hex_number();
-    let macro_invocation = lex_macro_invocation();
-    let builtin_fn = lex_builtin_fn();
+pub fn parse_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+    let newline = parse_newline_and_comments();
+    let opcode = parse_opcode_or_jump_label();
+    let hex_literal = parse_hex_number();
+    let macro_invocation = parse_macro_invocation();
+    let builtin_fn = parse_builtin_fn();
 
     builtin_fn
         .or(macro_invocation)
@@ -89,7 +89,7 @@ pub fn lex_macro_body() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
         .repeated()
 }
 
-fn lex_macro_invocation() -> impl Parser<char, Token, Error = Simple<char>> {
+fn parse_macro_invocation() -> impl Parser<char, Token, Error = Simple<char>> {
     let ident = text::ident();
 
     ident
@@ -100,8 +100,8 @@ fn lex_macro_invocation() -> impl Parser<char, Token, Error = Simple<char>> {
         .labelled("macro_invocation")
 }
 
-/// Lex Builtin function invocations
-fn lex_builtin_fn() -> impl Parser<char, Token, Error = Simple<char>> {
+/// parse Builtin function invocations
+fn parse_builtin_fn() -> impl Parser<char, Token, Error = Simple<char>> {
     text::ident()
         .then_ignore(just('('))
         // TODO: parse args
@@ -117,7 +117,7 @@ fn lex_builtin_fn() -> impl Parser<char, Token, Error = Simple<char>> {
         .labelled("builtin_fn_invocation")
 }
 
-pub fn lex_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn parse_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {
     just('0')
         .chain(just('x'))
         .chain::<char, _, _>(
@@ -131,7 +131,7 @@ pub fn lex_hex_number() -> impl Parser<char, Token, Error = Simple<char>> {
         .padded()
 }
 
-fn lex_opcode_or_jump_label() -> impl Parser<char, Token, Error = Simple<char>> {
+fn parse_opcode_or_jump_label() -> impl Parser<char, Token, Error = Simple<char>> {
     text::ident()
         .map(|ident: String| {
             OPCODES_MAP

@@ -3,8 +3,10 @@
 
 use chumsky::prelude::*;
 use chumsky_huff::{
+    lexer::lexer,
     parser::{
-        constants::lex_constant, macros::lex_macro, token::Token, utils::lex_newline_and_comments,
+        constants::parse_constant, macros::parse_macro, token::Token,
+        utils::parse_newline_and_comments,
     },
     utils::{
         abi::{Constructor, Error, Event, Function},
@@ -22,17 +24,17 @@ use chumsky_huff::{
 // Create a token mapping of keyword to opcode
 
 fn parser() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    let program = lex_program();
+    let program = parse_program();
 
     program.then_ignore(end())
 }
 
-fn lex_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    let macro_lexer = lex_macro();
-    let newline = lex_newline_and_comments();
-    let constant = lex_constant();
+fn parse_program() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+    let macro_parseer = parse_macro();
+    let newline = parse_newline_and_comments();
+    let constant = parse_constant();
 
-    macro_lexer
+    macro_parseer
         .or(newline)
         .or(constant)
         // Naive strategy ignores unexpected definitions
@@ -44,5 +46,9 @@ fn main() {
     let file_path = std::env::args().nth(1).unwrap();
     let src = std::fs::read_to_string(file_path).unwrap();
 
-    println!("{:?}", parser().parse_recovery(src));
+    // .parse_recovery(src).
+    let lexer = lexer().parse(src);
+    println!("{lexer:?}")
+    // let debug = parser().parse_recovery_verbose(src);
+    // println!("{:?}", debug);
 }

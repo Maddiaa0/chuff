@@ -1,20 +1,20 @@
 use chumsky::{prelude::*, text::TextParser};
 
 use super::{
-    macros::lex_hex_number,
+    macros::parse_hex_number,
     token::Token,
-    utils::{equals, ident, key, lex_define},
+    utils::{equals, ident, key, parse_define},
 };
 
-/// Constant Lexer
+/// Constant parseer
 ///
 /// Find constants in the program, they are defined as
 /// `#define constant <name> = <value>`
 /// where value can either be FREE_STORAGE_POINTER() or a hex literal
-pub fn lex_constant() -> impl Parser<char, Token, Error = Simple<char>> {
-    let hex_literal = lex_hex_number();
-    let free_storage_pointer = lex_free_storage_pointer();
-    let define = lex_define();
+pub fn parse_constant() -> impl Parser<char, Token, Error = Simple<char>> {
+    let hex_literal = parse_hex_number();
+    let free_storage_pointer = parse_free_storage_pointer();
+    let define = parse_define();
     let constant_name = ident;
 
     let valid_constant_body = hex_literal
@@ -32,10 +32,10 @@ pub fn lex_constant() -> impl Parser<char, Token, Error = Simple<char>> {
         })
 }
 
-/// Free storage pointer lexer
+/// Free storage pointer parseer
 ///
 /// Match against `FREE_STORAGE_POINTER()`
-fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
+fn parse_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
     key("FREE".to_string())
         .then_ignore(just('_'))
         .then_ignore(key("STORAGE".to_string()))

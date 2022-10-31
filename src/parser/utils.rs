@@ -13,20 +13,20 @@ pub fn equals() -> impl Parser<char, char, Error = Simple<char>> {
     just('=').padded()
 }
 
-pub fn lex_define() -> impl Parser<char, (), Error = Simple<char>> {
+pub fn parse_define() -> impl Parser<char, (), Error = Simple<char>> {
     let key = |c| text::keyword(c).padded();
 
     just('#').then(key("define")).to(()).labelled("define")
 }
 
-/// Lexes non-newline whitespace, and return nothing if successful.
-pub fn lex_non_newline_whitespace() -> impl Parser<char, (), Error = Simple<char>> + Clone {
+/// parsees non-newline whitespace, and return nothing if successful.
+pub fn parse_non_newline_whitespace() -> impl Parser<char, (), Error = Simple<char>> + Clone {
     // See https://doc.rust-lang.org/reference/whitespace.html
     one_of("\t ").to(()).labelled("whitespace")
 }
 
-pub fn lex_newline_and_comments() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
-    let other_whitespace = lex_non_newline_whitespace();
+pub fn parse_newline_and_comments() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
+    let other_whitespace = parse_non_newline_whitespace();
 
     let comment = just("//")
         .then(take_until(just("\n")))

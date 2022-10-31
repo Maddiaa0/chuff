@@ -3,7 +3,7 @@ use std::fmt;
 
 /// All the EVM opcodes as a static array
 /// They are arranged in a particular order such that all the opcodes that have common
-/// prefixes are ordered by decreasing length to avoid mismatch when lexing.
+/// prefixes are ordered by decreasing length to avoid mismatch when parseing.
 /// Example : [origin, or] or [push32, ..., push3]
 pub const OPCODES: [&str; 146] = [
     "lt",

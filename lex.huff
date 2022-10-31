@@ -1,0 +1,7 @@
+#define fn something(name) {
+    add sub add sub __builtin()
+}
+
+#define jumptable SWITCH_TABLE {
+    something somehting
+}

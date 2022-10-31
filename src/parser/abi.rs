@@ -1,17 +1,17 @@
 // TODO:
 
-// /// Lex ABI Function
+// /// parse ABI Function
 // ///
 // /// An abi function is a solidity function selector that is typically located at the top of a
 // /// Huff file.
 // /// They exist in the form: `function <name>(<args>) <pure|view| > <public|external| > returns(<type>)
-// fn lex_abi_function() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
+// fn parse_abi_function() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
 //     // Bases
 //     let key = |w| text::keyword(w).padded();
 
 //     // Sub parsers
-//     let function_type = lex_function_type();
-//     let args_parser = lex_abi_args();
+//     let function_type = parse_function_type();
+//     let args_parser = parse_abi_args();
 
 //     key("function")
 //         .ignore_then(text::ident())
@@ -27,7 +27,7 @@
 //         })
 // }
 
-// fn lex_function_type() -> impl Parser<char, FunctionType, Error = Simple<char>> {
+// fn parse_function_type() -> impl Parser<char, FunctionType, Error = Simple<char>> {
 //     let key = |w| text::keyword(w).padded();
 
 //     key("view")
@@ -37,23 +37,23 @@
 //         .or(key("pure").to(FunctionType::Pure))
 // }
 
-// /// Lex ABI Event
+// /// parse ABI Event
 // ///
 // /// An abi event is a solidity event selector that is typically located at the top of a
 // /// Huff file.
 // /// They exist in the form: `event <name>(<args>)`
-// fn lex_abi_event() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
+// fn parse_abi_event() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
 
-// fn lex_abi_error() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
+// fn parse_abi_error() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
 
-// /// Lex ABI args
+// /// parse ABI args
 // ///
-// /// Lex abi args that match that of a solidity function signature
-// /// Uses lex solidity type to determine the validity of the type
-// fn lex_abi_args() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {}
+// /// parse abi args that match that of a solidity function signature
+// /// Uses parse solidity type to determine the validity of the type
+// fn parse_abi_args() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {}
 
-// /// Lex int type
-// fn lex_int_type() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {
+// /// parse int type
+// fn parse_int_type() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {
 //     let key = |w| text::keyword(w);
 
 //     key("int")
@@ -62,8 +62,8 @@
 //         .map(|size: String| FunctionParamType::Int(size.parse().unwrap()))
 // }
 
-// /// Lex uint type
-// fn lex_uint_type() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {
+// /// parse uint type
+// fn parse_uint_type() -> impl Parser<char, FunctionParamType, Error = Simple<char>> + Clone {
 //     let key = |w| text::keyword(w);
 
 //     key("uint")
@@ -72,7 +72,7 @@
 //         .map(|size: String| FunctionParamType::Int(size.parse().unwrap()))
 // }
 
-// /// Lex ABI Type
+// /// parse ABI Type
 // ///
-// /// Lex a solidity type
-// fn lex_solidity_type() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
+// /// parse a solidity type
+// fn parse_solidity_type() -> impl Parser<char, Token, Error = Simple<char>> + Clone {}
