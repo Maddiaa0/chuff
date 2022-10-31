@@ -1,6 +1,6 @@
 # Mard!
 
-> `Mard` is a huff-language parser with a focus on error recovery at the parseing stages. It's purpose is to produce a partial AST that can be used to grant rich error feedback.
+> `Mard` is a huff-language parser with a focus on error recovery at the parsing stages. It's purpose is to produce a partial AST that can be used to grant rich error feedback.
 
 > **Warning**
 > Mard is currently under active development and is not suited for production use. Go for it, but it probably won't do what you want it to.
@@ -13,4 +13,11 @@ Mard is a huff parser build with [chumsky]("https://github.com/zesterer/chumsky"
 
 ### lsp
 
-This software is being written to start the effort in creating a functional [lsp]("https://microsoft.github.io/language-server-protocol/") for huff. Huff is a _hard_ language to learn as there are so many footguns. Creating an LSP aims to provide feedback to people learning that will reduce the pain of these footguns.
+This software is being written to start the effort in creating a functional [lsp]("https://microsoft.github.io/language-server-protocol/") for huff. Huff is a _hard_ language to learn as there are so many footguns. Creating an LSP aims to provide feedback to people learning that will reduce the pain of it all.
+
+## TODO
+
+- [ ] Complete Parsing Mvp
+- [ ] File based span support
+- [ ] Create example folder with an example of rich error feedback
+- [ ] Create sister project for ast verification

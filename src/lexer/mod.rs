@@ -20,6 +20,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let evm_type = lex_evm_type();
     let builtin_function = lex_builtin_function();
     let string = lex_string(); // Only relevant to file imports
+    let free_storage_pointer = lex_free_storage_pointer();
 
     let opcode_or_ident = lex_opcode();
 
@@ -30,6 +31,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     // Single token can be the below
     let token = define
         .or(evm_type)
+        .or(free_storage_pointer)
         .or(include)
         .or(string)
         .or(hex_literals)
@@ -218,6 +220,10 @@ pub fn lex_define() -> impl Parser<char, Token, Error = Simple<char>> {
         .then(key("define".to_string()))
         .to(Token::Define)
         .labelled("define")
+}
+
+pub fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
+    key("FREE_STORAGE_POINTER".to_string()).to(Token::FreeStoragePointer)
 }
 
 pub fn lex_include() -> impl Parser<char, Token, Error = Simple<char>> {

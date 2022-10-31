@@ -22,7 +22,7 @@ pub enum Statement {
     },
     ConstantDefinition {
         name: String,
-        value: String,
+        value: ConstantValue,
     },
 
     // TODO fill this out with the required info
@@ -31,7 +31,14 @@ pub enum Statement {
         takes: u32,
         returns: u32,
         body: Vec<Spanned<MacroBody>>,
+        args: Args,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum ConstantValue {
+    Literal(Literal),
+    FreeStoragePointer,
 }
 
 // TOOD: include args
@@ -40,20 +47,23 @@ pub enum MacroBody {
     Opcode(Opcode),
 
     // TODO give each of these names and args
-    MacroInvocation(String),
+    MacroInvocation { name: String, args: Args },
     ArgsInvocation(String),
-    BuiltinInvocation(String),
+    BuiltinInvocation { name: String, args: Args },
     JumpLabel(String),
     JumpLabelDest(String),
     HexLiteral(Literal),
 }
 
+pub type Args = Vec<Spanned<String>>;
+
 impl Statement {
     pub fn parser() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let include_parser = Self::parse_include();
         let macro_parser = Self::parse_macro();
+        let constant_parser = Self::parse_constants();
 
-        include_parser.or(macro_parser)
+        include_parser.or(macro_parser).or(constant_parser)
     }
 
     /// Parsers to extract nested information from the tokens
@@ -72,17 +82,46 @@ impl Statement {
             .map_with_span(|str: String, span| (Self::FileInclude { path: str }, span))
     }
 
+    fn parse_constants() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let parse_identifier = Self::ident_parser();
+        let constant_value = Self::parse_constant_value();
+
+        just(Token::Define)
+            .ignore_then(just(Token::Constant))
+            .ignore_then(parse_identifier)
+            .then_ignore(just(Token::Assign))
+            .then(constant_value)
+            .map_with_span(|(name, value), span| (Self::ConstantDefinition { name, value }, span))
+    }
+
+    fn parse_constant_value() -> impl Parser<Token, ConstantValue, Error = Simple<Token>> + Clone {
+        let parse_literal = Self::extract_literal();
+        let parse_fsp = Self::parse_fsp();
+
+        parse_literal
+            .map(|lit| ConstantValue::Literal(lit))
+            .or(parse_fsp.to(ConstantValue::FreeStoragePointer))
+    }
+
+    fn parse_fsp() -> impl Parser<Token, (), Error = Simple<Token>> + Clone {
+        just(Token::FreeStoragePointer)
+            .ignore_then(just(Token::OpenParen).ignore_then(just(Token::CloseParen)))
+            .ignored()
+    }
+
     fn parse_macro() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let parse_identifier = Self::ident_parser();
+        let parse_args = Self::parse_args();
         let macro_body = Self::parse_macro_body();
 
         just(Token::Define)
             .ignore_then(just(Token::Macro))
-            .ignore_then(Self::ident_parser())
+            .ignore_then(parse_identifier)
             .then_ignore(just(Token::OpenParen))
-            // TODO: Parse the arguments
+            .then(parse_args)
             .then_ignore(just(Token::CloseParen))
             .then_ignore(just(Token::Assign))
-            // TODO: handle takes / returns            .then_ignore(just(Token::OpenBrace))
+            // TODO: handle takes / returns
             .then_ignore(just(Token::OpenBrace))
             // TODO: remove newlines altogether?
             .then_ignore(just(Token::Newline).repeated().or_not())
@@ -90,17 +129,30 @@ impl Statement {
             .then_ignore(just(Token::Newline).repeated().or_not())
             .then_ignore(just(Token::CloseBrace))
             // TODO: recover with open and close delimiters
-            .map_with_span(|(name, body), span| {
+            .map_with_span(|((name, args), body), span| {
                 (
                     Self::MacroDefinition {
                         name,
                         takes: 0,
                         returns: 0,
                         body,
+                        args,
                     },
                     span,
                 )
             })
+    }
+
+    /// Parse arguments to macro calls
+    ///
+    /// Note: This cannot be used in abi function calls
+    fn parse_args() -> impl Parser<Token, Args, Error = Simple<Token>> + Clone {
+        let ident = Self::ident_parser();
+
+        ident
+            .then_ignore(just(Token::Comma).or_not())
+            .map_with_span(|arg, span| (arg, span))
+            .repeated()
     }
 
     fn parse_macro_body(
@@ -172,22 +224,24 @@ impl Statement {
     fn parse_builtin_invocation(
     ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let builtin_ident = Self::parse_builtin_ident();
+        let parse_args = Self::parse_args();
 
         builtin_ident
             .then_ignore(just(Token::OpenParen))
-            // TODO: parse with args
+            .then(parse_args)
             .then_ignore(just(Token::CloseParen))
-            .map_with_span(|builtin, span| (MacroBody::BuiltinInvocation(builtin), span))
+            .map_with_span(|(name, args), span| (MacroBody::BuiltinInvocation { name, args }, span))
     }
 
     fn parse_macro_invocation(
     ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let ident = Self::ident_parser();
+        let parse_args = Self::parse_args();
 
         ident
             .then_ignore(just(Token::OpenParen))
-            // TODO: parse with args
+            .then(parse_args)
             .then_ignore(just(Token::CloseParen))
-            .map_with_span(|ide, span| (MacroBody::MacroInvocation(ide), span))
+            .map_with_span(|(name, args), span| (MacroBody::MacroInvocation { name, args }, span))
     }
 }
