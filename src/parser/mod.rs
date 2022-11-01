@@ -33,10 +33,9 @@ pub enum Statement {
         name: String,
         value: ConstantValue,
     },
-
-    // TODO fill this out with the required info
     MacroDefinition {
         name: String,
+        macro_type: Spanned<MacroType>,
         takes: Spanned<usize>,
         returns: Spanned<usize>,
         body: Vec<Spanned<MacroBody>>,
@@ -48,6 +47,12 @@ pub enum Statement {
     AbiEvent(Event),
     AbiError(Error),
     AbiConstructor(Constructor),
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum MacroType {
+    Macro,
+    Fn,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -353,6 +358,7 @@ impl Statement {
     }
 
     fn parse_macro() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let parse_macro_type = Self::parse_macro_type();
         let parse_identifier = Self::extract_ident();
         let parse_args = Self::parse_args();
         let parse_takes = Self::parse_takes();
@@ -360,8 +366,8 @@ impl Statement {
         let macro_body = Self::parse_macro_body();
 
         just(Token::Define)
-            .ignore_then(just(Token::Macro))
-            .ignore_then(parse_identifier)
+            .ignore_then(parse_macro_type)
+            .then(parse_identifier)
             .then_ignore(just(Token::OpenParen))
             .then(parse_args)
             .then_ignore(just(Token::CloseParen))
@@ -372,20 +378,30 @@ impl Statement {
             .then(macro_body)
             .then_ignore(just(Token::CloseBrace))
             // TODO: recover with open and close delimiters
-            .map_with_span(|((((name, args), takes), returns), body), span| {
-                // ((name, args), body)
-                (
-                    Self::MacroDefinition {
-                        name,
-                        // Todo: more suitable default for takes and returns
-                        takes: takes.unwrap_or((0, 0..0)),
-                        returns: returns.unwrap_or((0, 0..0)),
-                        body,
-                        args,
-                    },
-                    span,
-                )
-            })
+            .map_with_span(
+                |(((((macro_type, name), args), takes), returns), body), span| {
+                    // ((name, args), body)
+                    (
+                        Self::MacroDefinition {
+                            name,
+                            macro_type,
+                            // Todo: more suitable default for takes and returns
+                            takes: takes.unwrap_or((0, 0..0)),
+                            returns: returns.unwrap_or((0, 0..0)),
+                            body,
+                            args,
+                        },
+                        span,
+                    )
+                },
+            )
+    }
+
+    fn parse_macro_type() -> impl Parser<Token, Spanned<MacroType>, Error = Simple<Token>> + Clone {
+        just(Token::Macro)
+            .to(MacroType::Macro)
+            .or(just(Token::Fn).to(MacroType::Fn))
+            .map_with_span(|tok, span| (tok, span))
     }
 
     // TODO: Morph parse takes and parse returns into one
