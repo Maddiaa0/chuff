@@ -1,12 +1,14 @@
 
-#include "./string/to/something";
+#define function test(bytes memory name, uint256) pure 
+#include "./string/to/something"
+#define constant con = FREE_STORAGE_POINTER()
+#define macro something(one, two, three) = {
+    add sub MAIN(one) __FUNC_SIG(two,three) jumplabel
 
+    jumplabel:
 
+    another_label: <landing>
+    
+    0x1
 
-#define fn something(name) {
-    add sub add sub __builtin()
-}
-
-#define jumptable SWITCH_TABLE {
-    something somehting
 }

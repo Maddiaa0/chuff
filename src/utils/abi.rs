@@ -1,28 +1,30 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::span::Spanned;
+
 /// Ripped from huff-rss
 /// Module that contains helper functions to parse ABI types
 
 /// #### Function
 ///
 /// A function definition.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Function {
     /// The function name
     pub name: String,
     /// The function inputs
-    pub inputs: Vec<FunctionParam>,
+    pub inputs: Vec<Spanned<FunctionParam>>,
     /// The function outputs
-    pub outputs: Vec<FunctionParam>,
+    pub outputs: Vec<Spanned<FunctionParam>>,
     /// Constant
     pub constant: bool,
     /// The state mutability
-    pub state_mutability: FunctionType,
+    pub state_mutability: Spanned<FunctionType>,
 }
 
 /// Function Types
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FunctionType {
     /// Viewable Function
     View,
@@ -37,7 +39,7 @@ pub enum FunctionType {
 /// #### Event
 ///
 /// An Event definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Event {
     /// The event name
     pub name: String,
@@ -50,7 +52,7 @@ pub struct Event {
 /// #### EventParam
 ///
 /// Event parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct EventParam {
     /// The parameter name
     pub name: String,
@@ -63,7 +65,7 @@ pub struct EventParam {
 /// #### Error
 ///
 /// An Error definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Error {
     /// The error name
     pub name: String,
@@ -74,7 +76,7 @@ pub struct Error {
 /// #### Constructor
 ///
 /// The contract constructor
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Constructor {
     /// Contstructor inputs
     pub inputs: Vec<FunctionParam>,
@@ -83,7 +85,7 @@ pub struct Constructor {
 /// #### FunctionParam
 ///
 /// A generic function parameter
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct FunctionParam {
     /// The function parameter name
     pub name: String,
@@ -96,7 +98,7 @@ pub struct FunctionParam {
 /// #### FunctionParamType
 ///
 /// The type of a function parameter
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum FunctionParamType {
     /// An address
     Address,

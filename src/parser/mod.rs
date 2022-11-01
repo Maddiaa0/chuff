@@ -4,7 +4,14 @@ use std::hash::Hash;
 use crate::{
     lexer::token::{Literal, Token},
     span::Spanned,
-    utils::opcodes::Opcode,
+    utils::{
+        abi::{
+            Constructor, Error, Event, EventParam, Function, FunctionParam, FunctionParamType,
+            FunctionType,
+        },
+        opcodes::Opcode,
+        types::PrimitiveEVMType,
+    },
 };
 
 pub fn parser() -> impl Parser<Token, Vec<Spanned<Statement>>, Error = Simple<Token>> {
@@ -33,6 +40,12 @@ pub enum Statement {
         body: Vec<Spanned<MacroBody>>,
         args: Args,
     },
+
+    // Abi types
+    AbiFunction(Function),
+    AbiEvent(Event),
+    AbiError(Error),
+    AbiConstructor(Constructor),
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -62,8 +75,12 @@ impl Statement {
         let include_parser = Self::parse_include();
         let macro_parser = Self::parse_macro();
         let constant_parser = Self::parse_constants();
+        let abi_parser = Self::parse_abi_definition();
 
-        include_parser.or(macro_parser).or(constant_parser)
+        include_parser
+            .or(abi_parser)
+            .or(macro_parser)
+            .or(constant_parser)
     }
 
     /// Parsers to extract nested information from the tokens
@@ -92,6 +109,110 @@ impl Statement {
             .then_ignore(just(Token::Assign))
             .then(constant_value)
             .map_with_span(|(name, value), span| (Self::ConstantDefinition { name, value }, span))
+    }
+
+    fn parse_abi_definition() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let parse_identifier = Self::ident_parser();
+        let parse_abi_args = Self::parse_abi_inputs();
+        let parse_return_types = Self::parse_return_type();
+        let parse_visibility = Self::parse_abi_visibility();
+
+        just(Token::Define)
+            .ignore_then(just(Token::Function))
+            .ignore_then(parse_identifier)
+            .then_ignore(just(Token::OpenParen))
+            .then(parse_abi_args.clone().or_not())
+            .then_ignore(just(Token::CloseParen))
+            .then(parse_visibility)
+            .then(parse_return_types.or_not())
+            // TODO: parse possible return types
+            .map_with_span(|(((name, inputs), state_mutability), return_types), span| {
+                (
+                    Self::AbiFunction(Function {
+                        name,
+                        inputs: inputs.unwrap_or(vec![]),
+                        outputs: return_types.unwrap_or(vec![]),
+                        constant: false,
+                        // TODO SET
+                        state_mutability: state_mutability,
+                    }),
+                    span,
+                )
+            })
+    }
+
+    fn parse_abi_visibility(
+    ) -> impl Parser<Token, Spanned<FunctionType>, Error = Simple<Token>> + Clone {
+        just(Token::View)
+            .map_with_span(|_, span| (FunctionType::View, span))
+            .or(just(Token::Payable).map_with_span(|_, span| (FunctionType::Payable, span)))
+            .or(just(Token::NonPayable).map_with_span(|_, span| (FunctionType::NonPayable, span)))
+            .or(just(Token::Pure).map_with_span(|_, span| (FunctionType::Pure, span)))
+    }
+
+    fn parse_return_type(
+    ) -> impl Parser<Token, Vec<Spanned<FunctionParam>>, Error = Simple<Token>> + Clone {
+        let abi_outputs = Self::parse_abi_inputs();
+
+        just(Token::Returns)
+            .ignore_then(just(Token::OpenParen))
+            .ignore_then(abi_outputs)
+            .then_ignore(just(Token::CloseParen))
+    }
+
+    // TODO: handle arrays / tuple definitions
+    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        select! {Token::PrimitiveType(prim_type) => prim_type}
+            .labelled("primitive_type")
+            .map(|token| match token {
+                PrimitiveEVMType::Address => FunctionParamType::Address,
+                PrimitiveEVMType::DynBytes => FunctionParamType::Bytes,
+                PrimitiveEVMType::Bool => FunctionParamType::Bool,
+                PrimitiveEVMType::String => FunctionParamType::String,
+                PrimitiveEVMType::Int(v) => FunctionParamType::Int(v),
+                PrimitiveEVMType::Bytes(v) => FunctionParamType::FixedBytes(v),
+                PrimitiveEVMType::Uint(v) => FunctionParamType::Uint(v),
+            })
+    }
+
+    fn parse_parameter_kind() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        just(Token::Memory)
+            .map(|_| "memory".to_string())
+            .or(just(Token::Storage).map(|_| "storage".to_string()))
+            .or(just(Token::Calldata).map(|_| "calldata".to_string()))
+    }
+
+    // // TODO: change return type
+    /// Parse a function abi input
+    ///
+    /// This parses a grammar in the following format
+    /// (<type> <kind(memory|storage)>? <name>)
+    fn parse_abi_inputs(
+    ) -> impl Parser<Token, Vec<Spanned<FunctionParam>>, Error = Simple<Token>> + Clone {
+        let primitive = Self::extract_primitive();
+        let param_kind = Self::parse_parameter_kind();
+        let ident = Self::ident_parser();
+
+        primitive
+            .then(param_kind.or_not())
+            .then(ident.or_not())
+            .map_with_span(
+                // TODO: workout what the internal type field is in huff-rs
+                |((param_kind, internal_type), name), span| {
+                    (
+                        FunctionParam {
+                            name: name.unwrap_or("".to_string()),
+                            // TODO: handle arrays / tuples
+                            kind: param_kind,
+                            // TODO: implement this properly
+                            internal_type: internal_type,
+                        },
+                        span,
+                    )
+                },
+            )
+            .then_ignore(just(Token::Comma).or_not())
+            .repeated()
     }
 
     fn parse_constant_value() -> impl Parser<Token, ConstantValue, Error = Simple<Token>> + Clone {

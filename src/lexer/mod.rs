@@ -205,6 +205,13 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
                     "jumptablepacked" => Token::JumpTablePacked,
                     "table" => Token::CodeTable,
 
+                    // TODO: do we only want these to lex as these tokens in a specific context?
+                    "pure" => Token::Pure,
+                    "payable" => Token::Payable,
+                    "nonpayable" => Token::NonPayable,
+                    "view" => Token::View,
+                    "returns" => Token::Returns,
+
                     _ => Token::Ident(ident),
                 },
             }
