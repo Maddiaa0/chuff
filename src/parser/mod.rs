@@ -77,8 +77,10 @@ impl Statement {
         let constant_parser = Self::parse_constants();
         let abi_parser = Self::parse_abi_definition();
         let event_parser = Self::parse_abi_event_definition();
+        let error_parser = Self::parse_errors();
 
         include_parser
+            .or(error_parser)
             .or(abi_parser)
             .or(event_parser)
             .or(macro_parser)
@@ -99,6 +101,19 @@ impl Statement {
         just(Token::Include)
             .ignore_then(Self::string_parser())
             .map_with_span(|str: String, span| (Self::FileInclude { path: str }, span))
+    }
+
+    fn parse_errors() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let parse_identifier = Self::ident_parser();
+        let func_params = Self::parse_abi_inputs();
+
+        just(Token::Define)
+            .ignore_then(just(Token::Error))
+            .ignore_then(parse_identifier)
+            .then_ignore(just(Token::OpenParen))
+            .then(func_params)
+            .then_ignore(just(Token::CloseParen))
+            .map_with_span(|(name, inputs), span| (Self::AbiError(Error { name, inputs }), span))
     }
 
     fn parse_constants() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {

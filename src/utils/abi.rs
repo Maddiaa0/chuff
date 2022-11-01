@@ -65,12 +65,12 @@ pub struct EventParam {
 /// #### Error
 ///
 /// An Error definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Error {
     /// The error name
     pub name: String,
     /// The error inputs
-    pub inputs: Vec<FunctionParam>,
+    pub inputs: Vec<Spanned<FunctionParam>>,
 }
 
 /// #### Constructor
