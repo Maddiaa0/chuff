@@ -602,3 +602,246 @@ pub enum Opcode {
     /// Get hash of an account’s code
     Extcodehash,
 }
+
+impl Opcode {
+    /// Translates an Opcode into a string
+    pub fn string(&self) -> String {
+        let opcode_str = match self {
+            Opcode::Stop => "00",
+            Opcode::Add => "01",
+            Opcode::Mul => "02",
+            Opcode::Sub => "03",
+            Opcode::Div => "04",
+            Opcode::Sdiv => "05",
+            Opcode::Mod => "06",
+            Opcode::Smod => "07",
+            Opcode::Addmod => "08",
+            Opcode::Mulmod => "09",
+            Opcode::Exp => "0a",
+            Opcode::Signextend => "0b",
+            Opcode::Lt => "10",
+            Opcode::Gt => "11",
+            Opcode::Slt => "12",
+            Opcode::Sgt => "13",
+            Opcode::Eq => "14",
+            Opcode::Iszero => "15",
+            Opcode::And => "16",
+            Opcode::Or => "17",
+            Opcode::Xor => "18",
+            Opcode::Not => "19",
+            Opcode::Byte => "1a",
+            Opcode::Shl => "1b",
+            Opcode::Shr => "1c",
+            Opcode::Sar => "1d",
+            Opcode::Sha3 => "20",
+            Opcode::Address => "30",
+            Opcode::Balance => "31",
+            Opcode::Origin => "32",
+            Opcode::Caller => "33",
+            Opcode::Callvalue => "34",
+            Opcode::Calldataload => "35",
+            Opcode::Calldatasize => "36",
+            Opcode::Calldatacopy => "37",
+            Opcode::Codesize => "38",
+            Opcode::Codecopy => "39",
+            Opcode::Gasprice => "3a",
+            Opcode::Extcodesize => "3b",
+            Opcode::Extcodecopy => "3c",
+            Opcode::Returndatasize => "3d",
+            Opcode::Returndatacopy => "3e",
+            Opcode::Extcodehash => "3f",
+            Opcode::Blockhash => "40",
+            Opcode::Coinbase => "41",
+            Opcode::Timestamp => "42",
+            Opcode::Number => "43",
+            Opcode::Difficulty => "44",
+            Opcode::Prevrandao => "44",
+            Opcode::Gaslimit => "45",
+            Opcode::Chainid => "46",
+            Opcode::Selfbalance => "47",
+            Opcode::Basefee => "48",
+            Opcode::Pop => "50",
+            Opcode::Mload => "51",
+            Opcode::Mstore => "52",
+            Opcode::Mstore8 => "53",
+            Opcode::Sload => "54",
+            Opcode::Sstore => "55",
+            Opcode::Jump => "56",
+            Opcode::Jumpi => "57",
+            Opcode::Pc => "58",
+            Opcode::Msize => "59",
+            Opcode::Gas => "5a",
+            Opcode::Jumpdest => "5b",
+            Opcode::Push1 => "60",
+            Opcode::Push2 => "61",
+            Opcode::Push3 => "62",
+            Opcode::Push4 => "63",
+            Opcode::Push5 => "64",
+            Opcode::Push6 => "65",
+            Opcode::Push7 => "66",
+            Opcode::Push8 => "67",
+            Opcode::Push9 => "68",
+            Opcode::Push10 => "69",
+            Opcode::Push11 => "6a",
+            Opcode::Push12 => "6b",
+            Opcode::Push13 => "6c",
+            Opcode::Push14 => "6d",
+            Opcode::Push15 => "6e",
+            Opcode::Push16 => "6f",
+            Opcode::Push17 => "70",
+            Opcode::Push18 => "71",
+            Opcode::Push19 => "72",
+            Opcode::Push20 => "73",
+            Opcode::Push21 => "74",
+            Opcode::Push22 => "75",
+            Opcode::Push23 => "76",
+            Opcode::Push24 => "77",
+            Opcode::Push25 => "78",
+            Opcode::Push26 => "79",
+            Opcode::Push27 => "7a",
+            Opcode::Push28 => "7b",
+            Opcode::Push29 => "7c",
+            Opcode::Push30 => "7d",
+            Opcode::Push31 => "7e",
+            Opcode::Push32 => "7f",
+            Opcode::Dup1 => "80",
+            Opcode::Dup2 => "81",
+            Opcode::Dup3 => "82",
+            Opcode::Dup4 => "83",
+            Opcode::Dup5 => "84",
+            Opcode::Dup6 => "85",
+            Opcode::Dup7 => "86",
+            Opcode::Dup8 => "87",
+            Opcode::Dup9 => "88",
+            Opcode::Dup10 => "89",
+            Opcode::Dup11 => "8a",
+            Opcode::Dup12 => "8b",
+            Opcode::Dup13 => "8c",
+            Opcode::Dup14 => "8d",
+            Opcode::Dup15 => "8e",
+            Opcode::Dup16 => "8f",
+            Opcode::Swap1 => "90",
+            Opcode::Swap2 => "91",
+            Opcode::Swap3 => "92",
+            Opcode::Swap4 => "93",
+            Opcode::Swap5 => "94",
+            Opcode::Swap6 => "95",
+            Opcode::Swap7 => "96",
+            Opcode::Swap8 => "97",
+            Opcode::Swap9 => "98",
+            Opcode::Swap10 => "99",
+            Opcode::Swap11 => "9a",
+            Opcode::Swap12 => "9b",
+            Opcode::Swap13 => "9c",
+            Opcode::Swap14 => "9d",
+            Opcode::Swap15 => "9e",
+            Opcode::Swap16 => "9f",
+            Opcode::Log0 => "a0",
+            Opcode::Log1 => "a1",
+            Opcode::Log2 => "a2",
+            Opcode::Log3 => "a3",
+            Opcode::Log4 => "a4",
+            Opcode::TLoad => "b3",
+            Opcode::TStore => "b4",
+            Opcode::Create => "f0",
+            Opcode::Call => "f1",
+            Opcode::Callcode => "f2",
+            Opcode::Return => "f3",
+            Opcode::Delegatecall => "f4",
+            Opcode::Create2 => "f5",
+            Opcode::Staticcall => "fa",
+            Opcode::Revert => "fd",
+            Opcode::Invalid => "fe",
+            Opcode::Selfdestruct => "ff",
+        };
+        opcode_str.to_string()
+    }
+
+    /// Returns if the current opcode is a push opcode
+    pub fn is_push(&self) -> bool {
+        matches!(
+            self,
+            Opcode::Push1
+                | Opcode::Push2
+                | Opcode::Push3
+                | Opcode::Push4
+                | Opcode::Push5
+                | Opcode::Push6
+                | Opcode::Push7
+                | Opcode::Push8
+                | Opcode::Push9
+                | Opcode::Push10
+                | Opcode::Push11
+                | Opcode::Push12
+                | Opcode::Push13
+                | Opcode::Push14
+                | Opcode::Push15
+                | Opcode::Push16
+                | Opcode::Push17
+                | Opcode::Push18
+                | Opcode::Push19
+                | Opcode::Push20
+                | Opcode::Push21
+                | Opcode::Push22
+                | Opcode::Push23
+                | Opcode::Push24
+                | Opcode::Push25
+                | Opcode::Push26
+                | Opcode::Push27
+                | Opcode::Push28
+                | Opcode::Push29
+                | Opcode::Push30
+                | Opcode::Push31
+                | Opcode::Push32
+        )
+    }
+
+    /// Prefixes the literal if necessary
+    pub fn prefix_push_literal(&self, literal: &str) -> String {
+        if self.is_push() {
+            if let Ok(len) = u8::from_str_radix(&self.to_string(), 16) {
+                if len >= 96 {
+                    let size = (len - 96 + 1) * 2;
+                    // This case should be caught in the parser
+                    if literal.len() <= size as usize {
+                        let zeros_needed = size - literal.len() as u8;
+                        let zero_prefix = (0..zeros_needed)
+                            .map(|_| "0")
+                            .collect::<Vec<&str>>()
+                            .join("");
+                        return format!("{}{}", zero_prefix, literal);
+                    }
+                }
+            }
+        }
+
+        literal.to_string()
+    }
+
+    /// Checks if the value overflows the given push opcode
+    pub fn push_overflows(&self, literal: &str) -> bool {
+        if self.is_push() {
+            if let Ok(len) = u8::from_str_radix(&self.to_string(), 16) {
+                if len >= 96 {
+                    let size = (len - 96 + 1) * 2;
+                    return literal.len() > size as usize;
+                }
+            }
+        }
+
+        false
+    }
+}
+
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let opcode_str = self.string();
+        write!(f, "{}", opcode_str)
+    }
+}
+
+impl From<Opcode> for String {
+    fn from(o: Opcode) -> Self {
+        o.string()
+    }
+}

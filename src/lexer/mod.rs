@@ -1,8 +1,8 @@
 pub mod token;
 pub mod utils;
 
-use self::{token::Token, utils::key};
 use chumsky::prelude::*;
+use {token::Token, utils::key};
 
 use crate::{
     span::Spanned,
@@ -25,7 +25,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let opcode_or_ident = lex_opcode();
 
     // Erroneous tokens, but will be lexed just incase
-    // let literal = lex_literal();
     let number = lex_number();
 
     // Single token can be the below
@@ -79,7 +78,14 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
     just('0')
         .ignore_then(just('x'))
         .ignore_then(text::digits(16))
-        .map(|num: String| Token::Literal(str_to_bytes32(&num)))
+        .map(|num: String| {
+            // work out when to return it as an identifier
+            if num.len() < 64 {
+                return Token::Literal(str_to_bytes32(&num));
+            } else {
+                return Token::Code(num.clone());
+            }
+        })
 }
 
 pub fn lex_evm_type() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -226,6 +232,7 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
                     "error" => Token::Error,
                     "takes" => Token::Takes,
                     "returns" => Token::Returns,
+                    "codetable" => Token::CodeTable,
                     "jumptable" => Token::JumpTable,
                     "jumptablepacked" => Token::JumpTablePacked,
                     "table" => Token::CodeTable,

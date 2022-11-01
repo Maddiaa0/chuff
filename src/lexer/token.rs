@@ -88,6 +88,8 @@ pub enum Token {
     Str(String),
     /// Hex
     Literal(Literal),
+    /// Code snippet
+    Code(String),
     // /// Opcode
     Opcode(Opcode),
     /// Huff label (aka PC)

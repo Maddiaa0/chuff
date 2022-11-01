@@ -18,7 +18,9 @@ This software is being written to start the effort in creating a functional [lsp
 ## TODO
 
 - [ ] Complete Parsing Mvp
-  - [ ] Parse abi arrays etc
+  - [ ] Support Abi tuples
 - [ ] File based span support
+- [ ] Tests
+- [ ] Document each function
 - [ ] Create example folder with an example of rich error feedback
 - [ ] Create sister project for ast verification

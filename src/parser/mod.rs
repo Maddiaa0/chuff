@@ -11,6 +11,8 @@ use crate::{
             Constructor, Error, Event, EventParam, Function, FunctionParam, FunctionParamType,
             FunctionType,
         },
+        ast::TableKind,
+        bytes_util::bytes32_to_string,
         opcodes::Opcode,
         types::PrimitiveEVMType,
     },
@@ -38,8 +40,13 @@ pub enum Statement {
         macro_type: Spanned<MacroType>,
         takes: Spanned<usize>,
         returns: Spanned<usize>,
-        body: Vec<Spanned<MacroBody>>,
+        statements: Vec<Spanned<MacroBody>>,
         args: Args,
+    },
+    TableDefinition {
+        name: String,
+        kind: TableKind,
+        statements: Vec<Spanned<TableStatements>>,
     },
 
     // Abi types
@@ -47,6 +54,12 @@ pub enum Statement {
     AbiEvent(Event),
     AbiError(Error),
     AbiConstructor(Constructor),
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub enum TableStatements {
+    jump_label(String),
+    code(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -85,8 +98,10 @@ impl Statement {
         let abi_parser = Self::parse_abi_definition();
         let event_parser = Self::parse_abi_event_definition();
         let error_parser = Self::parse_errors();
+        let table_parser = Self::table_parser();
 
         include_parser
+            .or(table_parser)
             .or(error_parser)
             .or(abi_parser)
             .or(event_parser)
@@ -174,6 +189,21 @@ impl Statement {
             })
     }
 
+    fn extract_codetable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        let code_from_literal = Self::extract_code_from_literal();
+        let code = Self::extract_code();
+
+        code_from_literal.or(code)
+    }
+
+    fn extract_code_from_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Literal(lit) => bytes32_to_string(&lit, false)}.labelled("codetable_code")
+    }
+
+    fn extract_code() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Code(string) => string}.labelled("codetable_code")
+    }
+
     // Parse high level functions
 
     fn parse_include() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
@@ -193,6 +223,88 @@ impl Statement {
             .then(func_params)
             .then_ignore(just(Token::CloseParen))
             .map_with_span(|(name, inputs), span| (Self::AbiError(Error { name, inputs }), span))
+    }
+
+    fn table_parser() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let jump_table = Self::parse_jump_table();
+        let code_table = Self::parse_code_table();
+
+        jump_table.or(code_table)
+    }
+
+    fn parse_jump_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let table_kind = Self::parse_jump_table_kind();
+        let ident = Self::extract_ident();
+        let table_contents = Self::parse_jump_table_contents();
+
+        just(Token::Define)
+            .ignore_then(table_kind)
+            .then(ident)
+            .then_ignore(just(Token::OpenParen).or_not())
+            .then_ignore(just(Token::CloseParen).or_not())
+            .then_ignore(just(Token::Assign).or_not())
+            .then_ignore(just(Token::OpenBrace))
+            .then(table_contents)
+            .then_ignore(just(Token::CloseBrace))
+            .map_with_span(|((table_kind, name), contents), span| {
+                (
+                    Self::TableDefinition {
+                        name: name,
+                        kind: table_kind,
+                        // TODO: parse these
+                        statements: contents,
+                    },
+                    span,
+                )
+            })
+    }
+
+    fn parse_jump_table_kind() -> impl Parser<Token, TableKind, Error = Simple<Token>> + Clone {
+        just(Token::JumpTable)
+            .to(TableKind::JumpTable)
+            .or(just(Token::JumpTablePacked).to(TableKind::JumpTablePacked))
+            .then_ignore(just(Token::OpenParen).or_not())
+            .then_ignore(just(Token::CloseParen).or_not())
+            .then_ignore(just(Token::Assign).or_not())
+            .then_ignore(just(Token::OpenBrace))
+    }
+
+    fn parse_jump_table_contents(
+    ) -> impl Parser<Token, Vec<Spanned<TableStatements>>, Error = Simple<Token>> + Clone {
+        let ident = Self::extract_ident();
+
+        ident
+            .map_with_span(|ident, span| (TableStatements::jump_label(ident), span))
+            .repeated()
+    }
+
+    // TODO: parse code tables and jump tables seperately, they dont have much overlap
+    fn parse_code_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let extract_codetable_code = Self::extract_codetable();
+        let ident = Self::extract_ident();
+
+        let codetable =
+            extract_codetable_code.map_with_span(|code, span| (TableStatements::code(code), span));
+
+        just(Token::Define)
+            .ignore_then(just(Token::CodeTable).to(TableKind::CodeTable))
+            .then_ignore(just(Token::OpenParen).or_not())
+            .ignore_then(ident)
+            .then_ignore(just(Token::CloseParen).or_not())
+            .then_ignore(just(Token::Assign).or_not())
+            .then_ignore(just(Token::OpenBrace))
+            .then(codetable)
+            .then_ignore(just(Token::CloseBrace))
+            .map_with_span(|(name, table_content), span| {
+                (
+                    Self::TableDefinition {
+                        name: name,
+                        kind: TableKind::CodeTable,
+                        statements: vec![table_content],
+                    },
+                    span,
+                )
+            })
     }
 
     fn parse_constants() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
@@ -388,7 +500,7 @@ impl Statement {
                             // Todo: more suitable default for takes and returns
                             takes: takes.unwrap_or((0, 0..0)),
                             returns: returns.unwrap_or((0, 0..0)),
-                            body,
+                            statements: body,
                             args,
                         },
                         span,
