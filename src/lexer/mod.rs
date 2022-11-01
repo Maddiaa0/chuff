@@ -56,7 +56,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         )
         .then_ignore(end());
 
-    newline.clone().ignore_then(tokens)
+    newline.clone().or_not().ignore_then(tokens)
 }
 
 pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {

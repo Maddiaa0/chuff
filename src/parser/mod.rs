@@ -91,6 +91,15 @@ pub enum MacroBody {
 pub type Args = Vec<Spanned<String>>;
 
 impl Statement {
+    /// Top level Parser
+    ///
+    /// Attempts to parse, file inclusions, macros, fns, constants, abi events, errors, tables
+    /// etc.
+    ///
+    /// Each top level item has its OWN parser that will attempt to match the current token
+    /// in the stream.
+    ///
+    /// If any error occurs at this level, the parser will attempt to recover to the next DEFINE or INCLUDES token.
     pub fn parser() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let include_parser = Self::parse_include();
         let macro_parser = Self::parse_macro();
@@ -107,101 +116,7 @@ impl Statement {
             .or(event_parser)
             .or(macro_parser)
             .or(constant_parser)
-    }
-
-    // Utility functions to extract data from lexing tokens
-
-    /// Parsers to extract nested information from the tokens
-    fn extract_string() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::Str(str) => str }.labelled("string")
-    }
-
-    fn extract_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::Ident(str) => str}.labelled("identifier")
-    }
-
-    fn extract_opcode() -> impl Parser<Token, Opcode, Error = Simple<Token>> + Clone {
-        select! {Token::Opcode(opcode) => opcode}.labelled("opcode")
-    }
-
-    fn extract_builtin_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::BuiltinFunction(name) => name}.labelled("builtin")
-    }
-
-    fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
-        select! { Token::Literal(lit) => lit }.labelled("hex_literal")
-    }
-
-    fn extract_number() -> impl Parser<Token, usize, Error = Simple<Token>> + Clone {
-        select! { Token::Num(val) => val}.labelled("number")
-    }
-
-    // TODO: handle tuple definitions
-    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
-        let fixed_primitive = Self::extract_fixed_primitive();
-        let array_primitive = Self::extract_array_primitive();
-
-        fixed_primitive.or(array_primitive)
-    }
-
-    fn extract_fixed_primitive(
-    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
-        select! {Token::PrimitiveType(prim_type) => prim_type}
-            .labelled("primitive_type")
-            .map(|token| match token {
-                PrimitiveEVMType::Address => FunctionParamType::Address,
-                PrimitiveEVMType::DynBytes => FunctionParamType::Bytes,
-                PrimitiveEVMType::Bool => FunctionParamType::Bool,
-                PrimitiveEVMType::String => FunctionParamType::String,
-                PrimitiveEVMType::Int(v) => FunctionParamType::Int(v),
-                PrimitiveEVMType::Bytes(v) => FunctionParamType::FixedBytes(v),
-                PrimitiveEVMType::Uint(v) => FunctionParamType::Uint(v),
-            })
-    }
-
-    // TODO: shorten
-    fn extract_array_primitive(
-    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
-        select! { Token::ArrayType(primitive, array) => (primitive, array)}
-            .labelled("array_primitive")
-            .map(|(primitive, arr)| match primitive {
-                PrimitiveEVMType::Address => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::Address), arr)
-                }
-                PrimitiveEVMType::DynBytes => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::Bytes), arr)
-                }
-                PrimitiveEVMType::String => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::String), arr)
-                }
-                PrimitiveEVMType::Bool => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::Bool), arr)
-                }
-                PrimitiveEVMType::Int(v) => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::Int(v)), arr)
-                }
-                PrimitiveEVMType::Uint(v) => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::Uint(v)), arr)
-                }
-                PrimitiveEVMType::Bytes(v) => {
-                    FunctionParamType::Array(Box::new(FunctionParamType::FixedBytes(v)), arr)
-                }
-            })
-    }
-
-    fn extract_codetable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        let code_from_literal = Self::extract_code_from_literal();
-        let code = Self::extract_code();
-
-        code_from_literal.or(code)
-    }
-
-    fn extract_code_from_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::Literal(lit) => bytes32_to_string(&lit, false)}.labelled("codetable_code")
-    }
-
-    fn extract_code() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::Code(string) => string}.labelled("codetable_code")
+            .recover_with(skip_then_retry_until([Token::Define, Token::Include]))
     }
 
     // Parse high level functions
@@ -234,6 +149,7 @@ impl Statement {
         let code_table = Self::parse_code_table();
 
         jump_table.or(code_table)
+        // .recover_with(nested_delimiters(start, end, others, fallback))
     }
 
     fn parse_jump_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
@@ -639,5 +555,100 @@ impl Statement {
             .then(parse_args)
             .then_ignore(just(Token::CloseParen))
             .map_with_span(|(name, args), span| (MacroBody::MacroInvocation { name, args }, span))
+    }
+
+    // Utility functions to extract data from lexing tokens
+
+    /// Parsers to extract nested information from the tokens
+    fn extract_string() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Str(str) => str }.labelled("string")
+    }
+
+    fn extract_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Ident(str) => str}.labelled("identifier")
+    }
+
+    fn extract_opcode() -> impl Parser<Token, Opcode, Error = Simple<Token>> + Clone {
+        select! {Token::Opcode(opcode) => opcode}.labelled("opcode")
+    }
+
+    fn extract_builtin_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::BuiltinFunction(name) => name}.labelled("builtin")
+    }
+
+    fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
+        select! { Token::Literal(lit) => lit }.labelled("hex_literal")
+    }
+
+    fn extract_number() -> impl Parser<Token, usize, Error = Simple<Token>> + Clone {
+        select! { Token::Num(val) => val}.labelled("number")
+    }
+
+    // TODO: handle tuple definitions
+    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        let fixed_primitive = Self::extract_fixed_primitive();
+        let array_primitive = Self::extract_array_primitive();
+
+        fixed_primitive.or(array_primitive)
+    }
+
+    fn extract_fixed_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        select! {Token::PrimitiveType(prim_type) => prim_type}
+            .labelled("primitive_type")
+            .map(|token| match token {
+                PrimitiveEVMType::Address => FunctionParamType::Address,
+                PrimitiveEVMType::DynBytes => FunctionParamType::Bytes,
+                PrimitiveEVMType::Bool => FunctionParamType::Bool,
+                PrimitiveEVMType::String => FunctionParamType::String,
+                PrimitiveEVMType::Int(v) => FunctionParamType::Int(v),
+                PrimitiveEVMType::Bytes(v) => FunctionParamType::FixedBytes(v),
+                PrimitiveEVMType::Uint(v) => FunctionParamType::Uint(v),
+            })
+    }
+
+    // TODO: shorten
+    fn extract_array_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        select! { Token::ArrayType(primitive, array) => (primitive, array)}
+            .labelled("array_primitive")
+            .map(|(primitive, arr)| match primitive {
+                PrimitiveEVMType::Address => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Address), arr)
+                }
+                PrimitiveEVMType::DynBytes => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Bytes), arr)
+                }
+                PrimitiveEVMType::String => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::String), arr)
+                }
+                PrimitiveEVMType::Bool => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Bool), arr)
+                }
+                PrimitiveEVMType::Int(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Int(v)), arr)
+                }
+                PrimitiveEVMType::Uint(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Uint(v)), arr)
+                }
+                PrimitiveEVMType::Bytes(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::FixedBytes(v)), arr)
+                }
+            })
+    }
+
+    fn extract_codetable() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        let code_from_literal = Self::extract_code_from_literal();
+        let code = Self::extract_code();
+
+        code_from_literal.or(code)
+    }
+
+    fn extract_code_from_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Literal(lit) => bytes32_to_string(&lit, false)}.labelled("codetable_code")
+    }
+
+    fn extract_code() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::Code(string) => string}.labelled("codetable_code")
     }
 }
