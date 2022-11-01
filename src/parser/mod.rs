@@ -37,8 +37,8 @@ pub enum Statement {
     // TODO fill this out with the required info
     MacroDefinition {
         name: String,
-        takes: u32,
-        returns: u32,
+        takes: Spanned<usize>,
+        returns: Spanned<usize>,
         body: Vec<Spanned<MacroBody>>,
         args: Args,
     },
@@ -110,6 +110,10 @@ impl Statement {
 
     fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
         select! { Token::Literal(lit) => lit }.labelled("hex_literal")
+    }
+
+    fn extract_number() -> impl Parser<Token, usize, Error = Simple<Token>> + Clone {
+        select! { Token::Num(val) => val}.labelled("number")
     }
 
     // TODO: handle arrays / tuple definitions
@@ -351,6 +355,8 @@ impl Statement {
     fn parse_macro() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let parse_identifier = Self::extract_ident();
         let parse_args = Self::parse_args();
+        let parse_takes = Self::parse_takes();
+        let parse_returns = Self::parse_returns();
         let macro_body = Self::parse_macro_body();
 
         just(Token::Define)
@@ -360,25 +366,57 @@ impl Statement {
             .then(parse_args)
             .then_ignore(just(Token::CloseParen))
             .then_ignore(just(Token::Assign))
-            // TODO: handle takes / returns
+            .then(parse_takes.or_not())
+            .then(parse_returns.or_not())
             .then_ignore(just(Token::OpenBrace))
-            // TODO: remove newlines altogether?
-            .then_ignore(just(Token::Newline).repeated().or_not())
             .then(macro_body)
-            .then_ignore(just(Token::Newline).repeated().or_not())
             .then_ignore(just(Token::CloseBrace))
             // TODO: recover with open and close delimiters
-            .map_with_span(|((name, args), body), span| {
+            .map_with_span(|((((name, args), takes), returns), body), span| {
+                // ((name, args), body)
                 (
                     Self::MacroDefinition {
                         name,
-                        takes: 0,
-                        returns: 0,
+                        // Todo: more suitable default for takes and returns
+                        takes: takes.unwrap_or((0, 0..0)),
+                        returns: returns.unwrap_or((0, 0..0)),
                         body,
                         args,
                     },
                     span,
                 )
+            })
+    }
+
+    // TODO: Morph parse takes and parse returns into one
+    fn parse_takes() -> impl Parser<Token, Spanned<usize>, Error = Simple<Token>> + Clone {
+        let number = Self::extract_number();
+
+        just(Token::Takes)
+            .ignore_then(just(Token::OpenParen))
+            .ignore_then(number.or_not())
+            .then_ignore(just(Token::CloseParen))
+            .map_with_span(|num_takes: Option<usize>, span| {
+                let takes = match num_takes {
+                    Some(x) => x,
+                    None => 0,
+                };
+                (takes, span)
+            })
+    }
+    fn parse_returns() -> impl Parser<Token, Spanned<usize>, Error = Simple<Token>> + Clone {
+        let number = Self::extract_number();
+
+        just(Token::Returns)
+            .ignore_then(just(Token::OpenParen))
+            .ignore_then(number.or_not())
+            .then_ignore(just(Token::CloseParen))
+            .map_with_span(|num_returns: Option<usize>, span| {
+                let takes = match num_returns {
+                    Some(x) => x,
+                    None => 0,
+                };
+                (takes, span)
             })
     }
 
