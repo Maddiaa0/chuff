@@ -39,12 +39,12 @@ pub enum FunctionType {
 /// #### Event
 ///
 /// An Event definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Event {
     /// The event name
     pub name: String,
     /// The event inputs
-    pub inputs: Vec<EventParam>,
+    pub inputs: Vec<Spanned<EventParam>>,
     /// Anonymity
     pub anonymous: bool,
 }

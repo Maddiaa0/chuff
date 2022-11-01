@@ -1,4 +1,6 @@
 
+#define event some(bytes indexed yes, address indexed no, uint256)
+
 #define function test(bytes memory name, uint256) pure 
 #include "./string/to/something"
 #define constant con = FREE_STORAGE_POINTER()

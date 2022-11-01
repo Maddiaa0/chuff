@@ -76,9 +76,11 @@ impl Statement {
         let macro_parser = Self::parse_macro();
         let constant_parser = Self::parse_constants();
         let abi_parser = Self::parse_abi_definition();
+        let event_parser = Self::parse_abi_event_definition();
 
         include_parser
             .or(abi_parser)
+            .or(event_parser)
             .or(macro_parser)
             .or(constant_parser)
     }
@@ -109,6 +111,31 @@ impl Statement {
             .then_ignore(just(Token::Assign))
             .then(constant_value)
             .map_with_span(|(name, value), span| (Self::ConstantDefinition { name, value }, span))
+    }
+
+    // TODO: parse event args
+    fn parse_abi_event_definition(
+    ) -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
+        let event_args = Self::parse_event_inputs();
+        let ident = Self::ident_parser();
+
+        just(Token::Define)
+            .ignore_then(just(Token::Event))
+            .ignore_then(ident)
+            .then_ignore(just(Token::OpenParen))
+            .then(event_args)
+            .then_ignore(just(Token::CloseParen))
+            .map_with_span(|(name, inputs), span| {
+                (
+                    Self::AbiEvent(Event {
+                        name,
+                        inputs,
+                        // TODO: work out what this is
+                        anonymous: false,
+                    }),
+                    span,
+                )
+            })
     }
 
     fn parse_abi_definition() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
@@ -211,6 +238,28 @@ impl Statement {
                     )
                 },
             )
+            .then_ignore(just(Token::Comma).or_not())
+            .repeated()
+    }
+
+    fn parse_event_inputs(
+    ) -> impl Parser<Token, Vec<Spanned<EventParam>>, Error = Simple<Token>> + Clone {
+        let primitive = Self::extract_primitive();
+        let ident = Self::ident_parser();
+
+        primitive
+            .then(just(Token::Indexed).or_not())
+            .then(ident.or_not())
+            .map_with_span(|((kind, indexed), name), span| {
+                (
+                    EventParam {
+                        name: name.unwrap_or("".to_string()),
+                        kind,
+                        indexed: indexed.is_some(),
+                    },
+                    span,
+                )
+            })
             .then_ignore(just(Token::Comma).or_not())
             .repeated()
     }

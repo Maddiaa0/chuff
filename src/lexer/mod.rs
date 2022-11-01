@@ -211,6 +211,7 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
                     "nonpayable" => Token::NonPayable,
                     "view" => Token::View,
                     "returns" => Token::Returns,
+                    "indexed" => Token::Indexed,
 
                     _ => Token::Ident(ident),
                 },
