@@ -136,7 +136,7 @@ impl Statement {
         select! { Token::Num(val) => val}.labelled("number")
     }
 
-    // TODO: handle arrays / tuple definitions
+    // TODO: handle tuple definitions
     fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
         let fixed_primitive = Self::extract_fixed_primitive();
         let array_primitive = Self::extract_array_primitive();
@@ -225,6 +225,10 @@ impl Statement {
             .map_with_span(|(name, inputs), span| (Self::AbiError(Error { name, inputs }), span))
     }
 
+    /// Table Parser
+    ///
+    /// Parses either a jump table or a code table, both are stored as the same root type, TableDefinition
+    ///
     fn table_parser() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let jump_table = Self::parse_jump_table();
         let code_table = Self::parse_code_table();
@@ -235,14 +239,13 @@ impl Statement {
     fn parse_jump_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let table_kind = Self::parse_jump_table_kind();
         let ident = Self::extract_ident();
+        let optional_parens = Self::parse_optional_paren();
         let table_contents = Self::parse_jump_table_contents();
 
         just(Token::Define)
             .ignore_then(table_kind)
             .then(ident)
-            .then_ignore(just(Token::OpenParen).or_not())
-            .then_ignore(just(Token::CloseParen).or_not())
-            .then_ignore(just(Token::Assign).or_not())
+            .then_ignore(optional_parens.or_not())
             .then_ignore(just(Token::OpenBrace))
             .then(table_contents)
             .then_ignore(just(Token::CloseBrace))
@@ -263,10 +266,13 @@ impl Statement {
         just(Token::JumpTable)
             .to(TableKind::JumpTable)
             .or(just(Token::JumpTablePacked).to(TableKind::JumpTablePacked))
-            .then_ignore(just(Token::OpenParen).or_not())
-            .then_ignore(just(Token::CloseParen).or_not())
-            .then_ignore(just(Token::Assign).or_not())
-            .then_ignore(just(Token::OpenBrace))
+    }
+
+    fn parse_optional_paren() -> impl Parser<Token, (), Error = Simple<Token>> + Clone {
+        just(Token::OpenParen)
+            .ignore_then(just(Token::CloseParen))
+            .ignore_then(just(Token::Assign))
+            .ignored()
     }
 
     fn parse_jump_table_contents(
@@ -278,20 +284,18 @@ impl Statement {
             .repeated()
     }
 
-    // TODO: parse code tables and jump tables seperately, they dont have much overlap
     fn parse_code_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let extract_codetable_code = Self::extract_codetable();
         let ident = Self::extract_ident();
+        let optional_parens = Self::parse_optional_paren();
 
         let codetable =
             extract_codetable_code.map_with_span(|code, span| (TableStatements::code(code), span));
 
         just(Token::Define)
             .ignore_then(just(Token::CodeTable).to(TableKind::CodeTable))
-            .then_ignore(just(Token::OpenParen).or_not())
             .ignore_then(ident)
-            .then_ignore(just(Token::CloseParen).or_not())
-            .then_ignore(just(Token::Assign).or_not())
+            .then_ignore(optional_parens.or_not())
             .then_ignore(just(Token::OpenBrace))
             .then(codetable)
             .then_ignore(just(Token::CloseBrace))
@@ -492,7 +496,6 @@ impl Statement {
             // TODO: recover with open and close delimiters
             .map_with_span(
                 |(((((macro_type, name), args), takes), returns), body), span| {
-                    // ((name, args), body)
                     (
                         Self::MacroDefinition {
                             name,
