@@ -21,7 +21,7 @@ fn main() -> Result<(), String> {
     let src_len = src.chars().count();
 
     // .parse_recovery(src).
-    let (tokens, lex_errors) = lexer().parse_recovery(src);
+    let (tokens, _lex_errors) = lexer().parse_recovery(src);
     println!("TOKENS");
     println!("{tokens:?}");
 
@@ -31,7 +31,7 @@ fn main() -> Result<(), String> {
         let clean_tokens = tokens
             .into_iter()
             .filter(|(token, _)| token.clone() != Token::Newline);
-        let token_stream = Stream::from_iter(src_len..src_len + 1, clean_tokens.into_iter());
+        let token_stream = Stream::from_iter(src_len..src_len + 1, clean_tokens);
         parser().parse_recovery(token_stream)
     } else {
         (None, vec![])

@@ -56,7 +56,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         )
         .then_ignore(end());
 
-    newline.clone().or_not().ignore_then(tokens)
+    newline.or_not().ignore_then(tokens)
 }
 
 pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -81,9 +81,9 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|num: String| {
             // work out when to return it as an identifier
             if num.len() < 64 {
-                return Token::Literal(str_to_bytes32(&num));
+                Token::Literal(str_to_bytes32(&num))
             } else {
-                return Token::Code(num.clone());
+                Token::Code(num)
             }
         })
 }
@@ -114,7 +114,7 @@ pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> 
     just('_')
         .ignore_then(just('_'))
         .ignore_then(text::ident())
-        .map(|ident| Token::BuiltinFunction(ident))
+        .map(Token::BuiltinFunction)
 }
 
 pub fn lex_abi_type() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
@@ -219,7 +219,7 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
             let is_opcode = OPCODES_MAP.get(&ident);
 
             match is_opcode {
-                Some(opcode) => Token::Opcode(opcode.clone()),
+                Some(opcode) => Token::Opcode(*opcode),
                 None => match ident.as_str() {
                     "macro" => Token::Macro,
                     "calldata" => Token::Calldata,

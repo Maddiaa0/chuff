@@ -45,20 +45,12 @@ pub struct Contract {
 impl Contract {
     /// Returns the first macro that matches the provided name
     pub fn find_macro_by_name(&self, name: &str) -> Option<MacroDefinition> {
-        if let Some(m) = self.macros.iter().find(|m| m.name == name) {
-            Some(m.clone())
-        } else {
-            None
-        }
+        self.macros.iter().find(|m| m.name == name).cloned()
     }
 
     /// Returns the first table that matches the provided name
     pub fn find_table_by_name(&self, name: &str) -> Option<TableDefinition> {
-        if let Some(t) = self.tables.iter().find(|t| t.name == name) {
-            Some(t.clone())
-        } else {
-            None
-        }
+        self.tables.iter().find(|t| t.name == name).cloned()
     }
 }
 
@@ -349,15 +341,15 @@ impl Display for StatementType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             StatementType::Literal(l) => write!(f, "LITERAL: {}", bytes32_to_string(l, true)),
-            StatementType::Opcode(o) => write!(f, "OPCODE: {}", o),
-            StatementType::Code(s) => write!(f, "CODE: {}", s),
+            StatementType::Opcode(o) => write!(f, "OPCODE: {o}"),
+            StatementType::Code(s) => write!(f, "CODE: {s}"),
             StatementType::MacroInvocation(m) => {
                 write!(f, "MACRO INVOCATION: {}", m.macro_name)
             }
-            StatementType::Constant(c) => write!(f, "CONSTANT: {}", c),
-            StatementType::ArgCall(c) => write!(f, "ARG CALL: {}", c),
+            StatementType::Constant(c) => write!(f, "CONSTANT: {c}"),
+            StatementType::ArgCall(c) => write!(f, "ARG CALL: {c}"),
             StatementType::Label(l) => write!(f, "LABEL: {}", l.name),
-            StatementType::LabelCall(l) => write!(f, "LABEL CALL: {}", l),
+            StatementType::LabelCall(l) => write!(f, "LABEL CALL: {l}"),
             StatementType::BuiltinFunctionCall(b) => {
                 write!(f, "BUILTIN FUNCTION CALL: {:?}", b.kind)
             }

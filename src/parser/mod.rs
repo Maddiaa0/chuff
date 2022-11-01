@@ -168,7 +168,7 @@ impl Statement {
             .map_with_span(|((table_kind, name), contents), span| {
                 (
                     Self::TableDefinition {
-                        name: name,
+                        name,
                         kind: table_kind,
                         // TODO: parse these
                         statements: contents,
@@ -218,7 +218,7 @@ impl Statement {
             .map_with_span(|(name, table_content), span| {
                 (
                     Self::TableDefinition {
-                        name: name,
+                        name,
                         kind: TableKind::CodeTable,
                         statements: vec![table_content],
                     },
@@ -273,7 +273,7 @@ impl Statement {
             .ignore_then(just(Token::Function))
             .ignore_then(parse_identifier)
             .then_ignore(just(Token::OpenParen))
-            .then(parse_abi_args.clone().or_not())
+            .then(parse_abi_args.or_not())
             .then_ignore(just(Token::CloseParen))
             .then(parse_visibility)
             .then(parse_return_types.or_not())
@@ -282,11 +282,11 @@ impl Statement {
                 (
                     Self::AbiFunction(Function {
                         name,
-                        inputs: inputs.unwrap_or(vec![]),
-                        outputs: return_types.unwrap_or(vec![]),
+                        inputs: inputs.unwrap_or_default(),
+                        outputs: return_types.unwrap_or_default(),
                         constant: false,
                         // TODO SET
-                        state_mutability: state_mutability,
+                        state_mutability,
                     }),
                     span,
                 )
@@ -342,7 +342,7 @@ impl Statement {
                             // TODO: handle arrays / tuples
                             kind: param_kind,
                             // TODO: implement this properly
-                            internal_type: internal_type,
+                            internal_type,
                         },
                         span,
                     )
@@ -379,7 +379,7 @@ impl Statement {
         let parse_fsp = Self::parse_fsp();
 
         parse_literal
-            .map(|lit| ConstantValue::Literal(lit))
+            .map(ConstantValue::Literal)
             .or(parse_fsp.to(ConstantValue::FreeStoragePointer))
     }
 
@@ -444,10 +444,7 @@ impl Statement {
             .ignore_then(number.or_not())
             .then_ignore(just(Token::CloseParen))
             .map_with_span(|num_takes: Option<usize>, span| {
-                let takes = match num_takes {
-                    Some(x) => x,
-                    None => 0,
-                };
+                let takes = num_takes.unwrap_or(0);
                 (takes, span)
             })
     }
@@ -459,10 +456,7 @@ impl Statement {
             .ignore_then(number.or_not())
             .then_ignore(just(Token::CloseParen))
             .map_with_span(|num_returns: Option<usize>, span| {
-                let takes = match num_returns {
-                    Some(x) => x,
-                    None => 0,
-                };
+                let takes = num_returns.unwrap_or(0);
                 (takes, span)
             })
     }
