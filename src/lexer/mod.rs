@@ -84,13 +84,24 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
 
 pub fn lex_evm_type() -> impl Parser<char, Token, Error = Simple<char>> {
     let abi_type = lex_abi_type();
+    let arr = lex_array();
 
     text::keyword("bool")
         .to(PrimitiveEVMType::Bool)
         .or(text::keyword("string").to(PrimitiveEVMType::String))
         .or(text::keyword("address").to(PrimitiveEVMType::Address))
         .or(abi_type)
-        .map(|t: PrimitiveEVMType| Token::PrimitiveType(t))
+        .then(arr.or_not())
+        .map(|(prim, is_arr)| match is_arr {
+            Some(arr) => {
+                if arr.is_empty() {
+                    Token::PrimitiveType(prim)
+                } else {
+                    Token::ArrayType(prim, arr)
+                }
+            }
+            None => Token::PrimitiveType(prim),
+        })
 }
 
 pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -107,6 +118,20 @@ pub fn lex_abi_type() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char
 
     uint.or(bytes).or(int)
 }
+
+/// Lex Array
+///
+pub fn lex_array() -> impl Parser<char, Vec<usize>, Error = Simple<char>> {
+    just('[')
+        .ignore_then(text::digits(10).or_not())
+        .then_ignore(just(']'))
+        .map(|num: Option<String>| match num {
+            Some(x) => x.parse().unwrap(),
+            None => 0,
+        })
+        .repeated()
+}
+
 pub fn lex_bytes() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
     just('b')
         .ignore_then(just('y'))
@@ -240,6 +265,7 @@ pub fn lex_include() -> impl Parser<char, Token, Error = Simple<char>> {
         .to(Token::Include)
         .labelled("include")
 }
+
 /// Lexes newlines, handling both CRLF and LF. Multiple consecutive newlines are
 /// collapsed into one for the sake of simpler parsing further down the compilation
 /// chain. (though of course, do NOT assume that newline tokens won't be followed by other

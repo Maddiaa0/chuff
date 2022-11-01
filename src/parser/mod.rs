@@ -1,6 +1,8 @@
 use chumsky::prelude::*;
 use std::hash::Hash;
 
+// TODO: parse constructor
+
 use crate::{
     lexer::token::{Literal, Token},
     span::Spanned,
@@ -87,24 +89,92 @@ impl Statement {
             .or(constant_parser)
     }
 
+    // Utility functions to extract data from lexing tokens
+
     /// Parsers to extract nested information from the tokens
-    fn string_parser() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+    fn extract_string() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Str(str) => str }.labelled("string")
     }
 
-    fn ident_parser() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+    fn extract_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Ident(str) => str}.labelled("identifier")
     }
 
+    fn extract_opcode() -> impl Parser<Token, Opcode, Error = Simple<Token>> + Clone {
+        select! {Token::Opcode(opcode) => opcode}.labelled("opcode")
+    }
+
+    fn extract_builtin_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
+        select! { Token::BuiltinFunction(name) => name}.labelled("builtin")
+    }
+
+    fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
+        select! { Token::Literal(lit) => lit }.labelled("hex_literal")
+    }
+
+    // TODO: handle arrays / tuple definitions
+    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        let fixed_primitive = Self::extract_fixed_primitive();
+        let array_primitive = Self::extract_array_primitive();
+
+        fixed_primitive.or(array_primitive)
+    }
+
+    fn extract_fixed_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        select! {Token::PrimitiveType(prim_type) => prim_type}
+            .labelled("primitive_type")
+            .map(|token| match token {
+                PrimitiveEVMType::Address => FunctionParamType::Address,
+                PrimitiveEVMType::DynBytes => FunctionParamType::Bytes,
+                PrimitiveEVMType::Bool => FunctionParamType::Bool,
+                PrimitiveEVMType::String => FunctionParamType::String,
+                PrimitiveEVMType::Int(v) => FunctionParamType::Int(v),
+                PrimitiveEVMType::Bytes(v) => FunctionParamType::FixedBytes(v),
+                PrimitiveEVMType::Uint(v) => FunctionParamType::Uint(v),
+            })
+    }
+
+    // TODO: shorten
+    fn extract_array_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
+        select! { Token::ArrayType(primitive, array) => (primitive, array)}
+            .labelled("array_primitive")
+            .map(|(primitive, arr)| match primitive {
+                PrimitiveEVMType::Address => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Address), arr)
+                }
+                PrimitiveEVMType::DynBytes => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Bytes), arr)
+                }
+                PrimitiveEVMType::String => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::String), arr)
+                }
+                PrimitiveEVMType::Bool => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Bool), arr)
+                }
+                PrimitiveEVMType::Int(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Int(v)), arr)
+                }
+                PrimitiveEVMType::Uint(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::Uint(v)), arr)
+                }
+                PrimitiveEVMType::Bytes(v) => {
+                    FunctionParamType::Array(Box::new(FunctionParamType::FixedBytes(v)), arr)
+                }
+            })
+    }
+
     // Parse high level functions
+
     fn parse_include() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         just(Token::Include)
-            .ignore_then(Self::string_parser())
+            .ignore_then(Self::extract_string())
             .map_with_span(|str: String, span| (Self::FileInclude { path: str }, span))
     }
 
     fn parse_errors() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
-        let parse_identifier = Self::ident_parser();
+        let parse_identifier = Self::extract_ident();
         let func_params = Self::parse_abi_inputs();
 
         just(Token::Define)
@@ -117,7 +187,7 @@ impl Statement {
     }
 
     fn parse_constants() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
-        let parse_identifier = Self::ident_parser();
+        let parse_identifier = Self::extract_ident();
         let constant_value = Self::parse_constant_value();
 
         just(Token::Define)
@@ -128,11 +198,10 @@ impl Statement {
             .map_with_span(|(name, value), span| (Self::ConstantDefinition { name, value }, span))
     }
 
-    // TODO: parse event args
     fn parse_abi_event_definition(
     ) -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let event_args = Self::parse_event_inputs();
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         just(Token::Define)
             .ignore_then(just(Token::Event))
@@ -154,7 +223,7 @@ impl Statement {
     }
 
     fn parse_abi_definition() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
-        let parse_identifier = Self::ident_parser();
+        let parse_identifier = Self::extract_ident();
         let parse_abi_args = Self::parse_abi_inputs();
         let parse_return_types = Self::parse_return_type();
         let parse_visibility = Self::parse_abi_visibility();
@@ -202,21 +271,6 @@ impl Statement {
             .then_ignore(just(Token::CloseParen))
     }
 
-    // TODO: handle arrays / tuple definitions
-    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
-        select! {Token::PrimitiveType(prim_type) => prim_type}
-            .labelled("primitive_type")
-            .map(|token| match token {
-                PrimitiveEVMType::Address => FunctionParamType::Address,
-                PrimitiveEVMType::DynBytes => FunctionParamType::Bytes,
-                PrimitiveEVMType::Bool => FunctionParamType::Bool,
-                PrimitiveEVMType::String => FunctionParamType::String,
-                PrimitiveEVMType::Int(v) => FunctionParamType::Int(v),
-                PrimitiveEVMType::Bytes(v) => FunctionParamType::FixedBytes(v),
-                PrimitiveEVMType::Uint(v) => FunctionParamType::Uint(v),
-            })
-    }
-
     fn parse_parameter_kind() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         just(Token::Memory)
             .map(|_| "memory".to_string())
@@ -233,7 +287,7 @@ impl Statement {
     ) -> impl Parser<Token, Vec<Spanned<FunctionParam>>, Error = Simple<Token>> + Clone {
         let primitive = Self::extract_primitive();
         let param_kind = Self::parse_parameter_kind();
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         primitive
             .then(param_kind.or_not())
@@ -260,7 +314,7 @@ impl Statement {
     fn parse_event_inputs(
     ) -> impl Parser<Token, Vec<Spanned<EventParam>>, Error = Simple<Token>> + Clone {
         let primitive = Self::extract_primitive();
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         primitive
             .then(just(Token::Indexed).or_not())
@@ -295,7 +349,7 @@ impl Statement {
     }
 
     fn parse_macro() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
-        let parse_identifier = Self::ident_parser();
+        let parse_identifier = Self::extract_ident();
         let parse_args = Self::parse_args();
         let macro_body = Self::parse_macro_body();
 
@@ -332,7 +386,7 @@ impl Statement {
     ///
     /// Note: This cannot be used in abi function calls
     fn parse_args() -> impl Parser<Token, Args, Error = Simple<Token>> + Clone {
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         ident
             .then_ignore(just(Token::Comma).or_not())
@@ -342,7 +396,7 @@ impl Statement {
 
     fn parse_macro_body(
     ) -> impl Parser<Token, Vec<Spanned<MacroBody>>, Error = Simple<Token>> + Clone {
-        let opcode = Self::parse_opcode();
+        let opcode = Self::extract_opcode();
         let macro_invocation = Self::parse_macro_invocation();
         let builtin_invocation = Self::parse_builtin_invocation();
         let jump_label = Self::parse_jump_label();
@@ -359,18 +413,6 @@ impl Statement {
             .repeated()
     }
 
-    fn parse_opcode() -> impl Parser<Token, Opcode, Error = Simple<Token>> + Clone {
-        select! {Token::Opcode(opcode) => opcode}.labelled("opcode")
-    }
-
-    fn parse_builtin_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
-        select! { Token::BuiltinFunction(name) => name}.labelled("builtin")
-    }
-
-    fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
-        select! { Token::Literal(lit) => lit }.labelled("hex_literal")
-    }
-
     fn parse_hex_literal() -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone
     {
         let get_literal = Self::extract_literal();
@@ -383,7 +425,7 @@ impl Statement {
     /// Parses jump labels in the pattern (ident, Option<:>). If the option resolves to have a value
     /// then is it determined that this is a jump location.
     fn parse_jump_label() -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         ident
             .then(just(Token::Colon).or_not())
@@ -398,7 +440,7 @@ impl Statement {
 
     fn parse_arg_invocation(
     ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
 
         just(Token::LeftAngle)
             .ignore_then(ident)
@@ -408,7 +450,7 @@ impl Statement {
 
     fn parse_builtin_invocation(
     ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
-        let builtin_ident = Self::parse_builtin_ident();
+        let builtin_ident = Self::extract_builtin_ident();
         let parse_args = Self::parse_args();
 
         builtin_ident
@@ -420,7 +462,7 @@ impl Statement {
 
     fn parse_macro_invocation(
     ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
-        let ident = Self::ident_parser();
+        let ident = Self::extract_ident();
         let parse_args = Self::parse_args();
 
         ident
