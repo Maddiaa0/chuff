@@ -39,7 +39,7 @@ pub enum FunctionType {
 /// #### Event
 ///
 /// An Event definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Event {
     /// The event name
     pub name: String,
@@ -52,7 +52,7 @@ pub struct Event {
 /// #### EventParam
 ///
 /// Event parameters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct EventParam {
     /// The parameter name
     pub name: String,
@@ -65,7 +65,7 @@ pub struct EventParam {
 /// #### Error
 ///
 /// An Error definition.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Error {
     /// The error name
     pub name: String,

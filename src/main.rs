@@ -1,3 +1,5 @@
+#![feature(trait_alias)]
+
 // TOOD: look in ast.rs of huff-rs and rip the types so that they can
 // be identical to the ones in the huff-rs crate
 
@@ -17,11 +19,19 @@ use chumsky_huff::{
 
 fn main() -> Result<(), String> {
     let file_path = std::env::args().nth(1).unwrap();
-    let src = std::fs::read_to_string(file_path).unwrap();
+    let src = std::fs::read_to_string(&file_path).unwrap();
     let src_len = src.chars().count();
+
+    // let eoi = Span::new(file_path, src_len..src_len);
 
     // .parse_recovery(src).
     let (tokens, _lex_errors) = lexer().parse_recovery(src);
+    // let (tokens, _lex_errors) = lexer().parse_recovery(chumsky::Stream::from_iter(
+    //     eoi,
+    //     src.chars()
+    //         .enumerate()
+    //         .map(|index, span| (Span::new(file_path, i..i + 1))),
+    // ));
     println!("TOKENS");
     println!("{tokens:?}");
 
