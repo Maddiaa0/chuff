@@ -9,6 +9,9 @@ use crate::{
     utils::{bytes_util::str_to_bytes32, opcodes::OPCODES_MAP, types::PrimitiveEVMType},
 };
 
+/// Chuff Lexer
+///
+/// The chuff lexer shares most of it's token set with the canonical huff-rs compiler.
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let other_whitespace = lex_non_newline_whitespace();
     let newline = lex_newline_and_comments();
@@ -21,10 +24,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let builtin_function = lex_builtin_function();
     let string = lex_string(); // Only relevant to file imports
     let free_storage_pointer = lex_free_storage_pointer();
-
-    let opcode_or_ident = lex_opcode();
-
-    // Erroneous tokens, but will be lexed just incase
+    let opcode_or_ident = lex_opcode_or_ident();
     let number = lex_number();
 
     // Single token can be the below
@@ -42,6 +42,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         // Skip invalid characters
         .recover_with(skip_then_retry_until([]));
 
+    // Attach spans to all of the resolved tokens
     let tokens = token
         .map_with_span(|tok, span| (tok, span))
         .padded_by(other_whitespace.repeated())
@@ -59,6 +60,9 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     newline.clone().or_not().ignore_then(tokens)
 }
 
+/// Lex Operators
+///
+/// Lexes all common single line characters
 pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {
     just('=')
         .to(Token::Assign)
@@ -74,6 +78,11 @@ pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {
         .or(just(":").to(Token::Colon))
 }
 
+/// Lex Literals
+///
+/// Lexes hex literals 0x<[0-9a-fA-F]?> when a literal is provided that is longer than 32 bytes, it is stored as
+/// a code item. Differentiation between Code and Literals is done at the parsing stage. This is not done at the lexing level to keep
+/// the lexer context free.
 pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
     just('0')
         .ignore_then(just('x'))
@@ -88,6 +97,9 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
         })
 }
 
+/// Lex EVM type
+///
+/// Lex address, uint256, etc. Including if they become array types.
 pub fn lex_evm_type() -> impl Parser<char, Token, Error = Simple<char>> {
     let abi_type = lex_abi_type();
     let arr = lex_array();
@@ -110,6 +122,11 @@ pub fn lex_evm_type() -> impl Parser<char, Token, Error = Simple<char>> {
         })
 }
 
+/// Lex Builtin Function
+///
+/// Builtin functions are interpreted as identifiers that are proceeded by two underscores `__`.
+///
+/// TODO: Currently any identifier is valid and discrimination is done at the parsing state, should it be moved forward?
 pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> {
     just('_')
         .ignore_then(just('_'))
@@ -117,6 +134,9 @@ pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> 
         .map(|ident| Token::BuiltinFunction(ident))
 }
 
+/// Lex ABI Type
+///
+/// Intermediary function to consolidate individually parsed EVM types.
 pub fn lex_abi_type() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
     let uint = lex_uint();
     let bytes = lex_bytes();
@@ -127,6 +147,7 @@ pub fn lex_abi_type() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char
 
 /// Lex Array
 ///
+/// Used to determine if an abi type is an array
 pub fn lex_array() -> impl Parser<char, Vec<usize>, Error = Simple<char>> {
     just('[')
         .ignore_then(text::digits(10).or_not())
@@ -138,6 +159,10 @@ pub fn lex_array() -> impl Parser<char, Vec<usize>, Error = Simple<char>> {
         .repeated()
 }
 
+/// Lex Bytes
+///
+/// Lexes the keyword `bytes` followed by an arbitrary length value, the size is discriminated in the
+/// parsing stage.
 pub fn lex_bytes() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
     just('b')
         .ignore_then(just('y'))
@@ -188,6 +213,9 @@ fn lex_string() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
         .labelled("string")
 }
 
+/// Lex Uint
+///
+/// Parses uint followed by an arbitrary number, validation is done at the parser level
 pub fn lex_uint() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
     just('u')
         .ignore_then(just('i'))
@@ -197,6 +225,9 @@ pub fn lex_uint() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
         .map(|digits: String| PrimitiveEVMType::Uint(digits.parse().unwrap()))
 }
 
+/// Lex Int
+///
+/// Parses Int followed by an arbitrary number, validation is done at the parser level
 pub fn lex_int() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
     just('i')
         .ignore_then(just('n'))
@@ -213,7 +244,13 @@ pub fn lex_number() -> impl Parser<char, Token, Error = Simple<char>> {
     text::digits(16).map(|n: String| Token::Num(n.parse().unwrap_or(0)))
 }
 
-pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
+/// Lex Opcode or identifier
+///
+/// Steps:
+///     1. Attempt to parse all identifiers as opcodes.
+///     2. If not an opcode, attempt to parse it as a keyword.
+///     3. If not a keyword, mark as an arbitrary identifier
+pub fn lex_opcode_or_ident() -> impl Parser<char, Token, Error = Simple<char>> {
     text::ident()
         .map(|ident: String| {
             let is_opcode = OPCODES_MAP.get(&ident);
@@ -254,6 +291,9 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
         .labelled("opcode")
 }
 
+/// Lex Define
+///
+/// Separately lex the define keyword due to the leading '#'
 pub fn lex_define() -> impl Parser<char, Token, Error = Simple<char>> {
     just('#')
         .then(key("define".to_string()))
@@ -261,15 +301,18 @@ pub fn lex_define() -> impl Parser<char, Token, Error = Simple<char>> {
         .labelled("define")
 }
 
-pub fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
-    key("FREE_STORAGE_POINTER".to_string()).to(Token::FreeStoragePointer)
-}
-
+/// Lex Include
+///
+/// Similarly to define, include must be lexed separately due to the leading '#'  
 pub fn lex_include() -> impl Parser<char, Token, Error = Simple<char>> {
     just('#')
         .then(key("include".to_string()))
         .to(Token::Include)
         .labelled("include")
+}
+
+pub fn lex_free_storage_pointer() -> impl Parser<char, Token, Error = Simple<char>> {
+    key("FREE_STORAGE_POINTER".to_string()).to(Token::FreeStoragePointer)
 }
 
 /// Lexes newlines, handling both CRLF and LF. Multiple consecutive newlines are

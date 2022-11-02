@@ -2,7 +2,6 @@ use chumsky::prelude::*;
 use std::hash::Hash;
 
 // TODO: parse constructor
-pub trait HParser<T> = chumsky::Parser<Token, T, Error = Simple<Token>> + Clone;
 
 use crate::{
     lexer::token::{Literal, Token},
@@ -19,15 +18,16 @@ use crate::{
     },
 };
 
-pub fn parser() -> impl Parser<Token, Vec<Spanned<Statement>>, Error = Simple<Token>> {
-    Statement::parser()
-        .repeated()
-        .at_least(1)
-        .then_ignore(end())
+// Note: Trait generics are in experimental, must use the nightly toolchain
+pub trait HParser<T> = chumsky::Parser<Token, T, Error = Simple<Token>> + Clone;
+
+/// Public entry point to the ast parser
+pub fn parser() -> impl Parser<Token, Vec<Spanned<Ast>>, Error = Simple<Token>> {
+    Ast::parser().repeated().at_least(1).then_ignore(end())
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
-pub enum Statement {
+pub enum Ast {
     ParsingError {
         token: Token,
         message: String,
@@ -62,10 +62,10 @@ pub enum Statement {
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum TableStatements {
-    jump_label(String),
-    code(String),
+    JumpLabel(String),
+    Code(String),
     // Include so that the compiler does not fail on an unexpected input
-    error(String),
+    Error(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -80,7 +80,6 @@ pub enum ConstantValue {
     FreeStoragePointer,
 }
 
-// TOOD: include args
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum MacroBody {
     Opcode(Opcode),
@@ -96,9 +95,14 @@ pub enum MacroBody {
     UnexpectedToken(String),
 }
 
-pub type Args = Vec<Spanned<String>>;
+pub type Args = Vec<Spanned<Arg>>;
+#[derive(Debug, Clone, PartialEq, Hash)]
+enum Arg {
+    Valid(String),
+    Invalid,
+}
 
-impl Statement {
+impl Ast {
     /// Top level Parser
     ///
     /// Attempts to parse, file inclusions, macros, fns, constants, abi events, errors, tables
@@ -124,6 +128,10 @@ impl Statement {
         // }))
     }
 
+    /// Nested Parser
+    ///
+    /// Utility function for when a smaller parser is enclosed by delimiters, a recovery strategy is automatically implemented based on
+    /// the provided delimiters
     fn nested_parser<'a, T: 'a>(
         parser: impl HParser<T> + 'a,
         open_delimiter: Token,
@@ -142,6 +150,7 @@ impl Statement {
                 ],
                 f,
             ))
+            .boxed()
     }
 
     // Parse high level functions
@@ -222,7 +231,7 @@ impl Statement {
             Self::parse_jump_table_contents(),
             Token::OpenBrace,
             Token::CloseBrace,
-            |span| vec![(TableStatements::error("Unexpected token".to_string()), span)],
+            |span| vec![(TableStatements::Error("Unexpected token".to_string()), span)],
         );
 
         table_kind
@@ -261,16 +270,16 @@ impl Statement {
         let parse_lit = Self::extract_literal();
 
         ident
-            .map_with_span(|ident, span| (TableStatements::jump_label(ident), span))
+            .map_with_span(|ident, span| (TableStatements::JumpLabel(ident), span))
             .or(parse_num.map_with_span(|num, span| {
                 (
-                    TableStatements::error("Number not expected".to_string()),
+                    TableStatements::Error("Number not expected".to_string()),
                     span,
                 )
             }))
             .or(parse_lit.map_with_span(|num, span| {
                 (
-                    TableStatements::error("Literal not expected".to_string()),
+                    TableStatements::Error("Literal not expected".to_string()),
                     span,
                 )
             }))
@@ -283,11 +292,11 @@ impl Statement {
         let optional_parens = Self::parse_optional_paren();
 
         let code_table =
-            extract_code_table_code.map_with_span(|code, span| (TableStatements::code(code), span));
+            extract_code_table_code.map_with_span(|code, span| (TableStatements::Code(code), span));
 
         let code_table_parser =
             Self::nested_parser(code_table, Token::OpenBrace, Token::CloseBrace, |span| {
-                (TableStatements::error("Unexpected".to_string()), span)
+                (TableStatements::Error("Unexpected".to_string()), span)
             });
 
         just(Token::CodeTable)
@@ -487,7 +496,7 @@ impl Statement {
             Self::parse_args(),
             Token::OpenParen,
             Token::CloseParen,
-            |span| vec![("____INVALID_ARG".to_string(), span)],
+            |span| vec![(Arg::Invalid, span)],
         );
 
         let parse_takes = Self::parse_takes();
@@ -564,14 +573,15 @@ impl Statement {
     /// Note: This cannot be used in abi function calls
     fn parse_args() -> impl Parser<Token, Args, Error = Simple<Token>> + Clone {
         let ident = Self::extract_ident();
+        let num = Self::extract_number();
+        let literal = Self::extract_literal();
 
-        // filter(|token| match token {
-        //     Token::Ident(_) => true,
-        //     _ => false,
-        // })
         ident
+            .map_with_span(|arg, span| (Arg::Valid(arg), span))
+            // Handle invalid cases
+            .or(num.map_with_span(|_, span| (Arg::Invalid, span)))
+            .or(literal.map_with_span(|_, span| (Arg::Invalid, span)))
             .then_ignore(just(Token::Comma).or_not())
-            .map_with_span(|arg, span| (arg, span))
             .repeated()
     }
 

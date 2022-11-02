@@ -94,7 +94,6 @@ pub enum Token {
     Opcode(Opcode),
     /// Huff label (aka PC)
     Label(String),
-    // // TODO: recursive dependency resolution at the lexing level?
     // Import path
     Path(String),
     /// EVM Type

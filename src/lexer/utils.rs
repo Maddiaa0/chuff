@@ -1,3 +1,5 @@
+//! Helper functions that appear many times at the lexing level
+
 use chumsky::{prelude::*, text::Character};
 
 pub fn key(c: String) -> impl Parser<char, (), Error = Simple<char>> + Clone {
