@@ -112,17 +112,16 @@ impl Statement {
         let define_parser = Self::parse_define();
         let include_parser = Self::parse_include();
 
-        define_parser
-            .or(include_parser)
-            .or(any().map_with_span(|token, span| {
-                (
-                    Self::ParsingError {
-                        token,
-                        message: "Expected #define or #include".to_string(),
-                    },
-                    span,
-                )
-            }))
+        define_parser.or(include_parser)
+        // .or(any().map_with_span(|token, span| {
+        //     (
+        //         Self::ParsingError {
+        //             token,
+        //             message: "Expected #define or #include".to_string(),
+        //         },
+        //         span,
+        //     )
+        // }))
     }
 
     fn nested_parser<'a, T: 'a>(
@@ -143,7 +142,6 @@ impl Statement {
                 ],
                 f,
             ))
-            .boxed()
     }
 
     // Parse high level functions
@@ -219,7 +217,13 @@ impl Statement {
         let table_kind = Self::parse_jump_table_kind();
         let ident = Self::extract_ident();
         let optional_parens = Self::parse_optional_paren();
-        let table_contents = Self::parse_jump_table_contents();
+
+        let table_contents = Self::nested_parser(
+            Self::parse_jump_table_contents(),
+            Token::OpenBrace,
+            Token::CloseBrace,
+            |span| vec![(TableStatements::error("Unexpected token".to_string()), span)],
+        );
 
         table_kind
             .then(ident)
@@ -271,24 +275,26 @@ impl Statement {
                 )
             }))
             .repeated()
-            .delimited_by(just(Token::OpenBrace), just(Token::CloseBrace))
     }
 
     fn parse_code_table() -> impl HParser<Spanned<Self>> + Clone {
-        let extract_codetable_code = Self::extract_codetable();
+        let extract_code_table_code = Self::extract_code_table();
         let ident = Self::extract_ident();
         let optional_parens = Self::parse_optional_paren();
 
-        let codetable =
-            extract_codetable_code.map_with_span(|code, span| (TableStatements::code(code), span));
+        let code_table =
+            extract_code_table_code.map_with_span(|code, span| (TableStatements::code(code), span));
+
+        let code_table_parser =
+            Self::nested_parser(code_table, Token::OpenBrace, Token::CloseBrace, |span| {
+                (TableStatements::error("Unexpected".to_string()), span)
+            });
 
         just(Token::CodeTable)
             .to(TableKind::CodeTable)
             .ignore_then(ident)
             .then_ignore(optional_parens.or_not())
-            .then_ignore(just(Token::OpenBrace))
-            .then(codetable)
-            .then_ignore(just(Token::CloseBrace))
+            .then(code_table_parser)
             .map_with_span(|(name, table_content), span| {
                 (
                     Self::TableDefinition {
@@ -316,11 +322,22 @@ impl Statement {
         let event_args = Self::parse_event_inputs();
         let ident = Self::extract_ident();
 
+        let event_body =
+            Self::nested_parser(event_args, Token::OpenParen, Token::CloseParen, |span| {
+                vec![(
+                    EventParam {
+                        name: "error".to_string(),
+                        indexed: false,
+                        // TODO: include erroneous
+                        kind: FunctionParamType::Address,
+                    },
+                    span,
+                )]
+            });
+
         just(Token::Event)
             .ignore_then(ident)
-            .then_ignore(just(Token::OpenParen))
-            .then(event_args)
-            .then_ignore(just(Token::CloseParen))
+            .then(event_body)
             .map_with_span(|(name, inputs), span| {
                 (
                     Self::AbiEvent(Event {
@@ -336,15 +353,20 @@ impl Statement {
 
     fn parse_abi_definition() -> impl HParser<Spanned<Self>> + Clone {
         let parse_identifier = Self::extract_ident();
-        let parse_abi_args = Self::parse_abi_inputs();
         let parse_return_types = Self::parse_return_type();
         let parse_visibility = Self::parse_abi_visibility();
 
+        let parse_abi_args = Self::parse_abi_inputs().or_not();
+        let nested_parse_abi_args = Self::nested_parser(
+            parse_abi_args,
+            Token::OpenParen,
+            Token::CloseParen,
+            |span| None,
+        );
+
         just(Token::Function)
             .ignore_then(parse_identifier)
-            .then_ignore(just(Token::OpenParen))
-            .then(parse_abi_args.or_not())
-            .then_ignore(just(Token::CloseParen))
+            .then(nested_parse_abi_args)
             .then(parse_visibility)
             .then(parse_return_types.or_not())
             // TODO: parse possible return types
@@ -372,12 +394,14 @@ impl Statement {
     }
 
     fn parse_return_type() -> impl HParser<Vec<Spanned<FunctionParam>>> + Clone {
-        let abi_outputs = Self::parse_abi_inputs();
+        let abi_outputs = Self::nested_parser(
+            Self::parse_abi_inputs(),
+            Token::OpenParen,
+            Token::CloseParen,
+            |span| Vec::new(),
+        );
 
-        just(Token::Returns)
-            .ignore_then(just(Token::OpenParen))
-            .ignore_then(abi_outputs)
-            .then_ignore(just(Token::CloseParen))
+        just(Token::Returns).ignore_then(abi_outputs)
     }
 
     fn parse_parameter_kind() -> impl HParser<String> + Clone {
@@ -458,27 +482,31 @@ impl Statement {
     fn parse_macro() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let parse_macro_type = Self::parse_macro_type();
         let parse_identifier = Self::extract_ident();
-        let parse_args = Self::parse_args().recover_with(nested_delimiters(
+
+        let parse_args = Self::nested_parser(
+            Self::parse_args(),
             Token::OpenParen,
             Token::CloseParen,
-            [],
             |span| vec![("____INVALID_ARG".to_string(), span)],
-        ));
+        );
+
         let parse_takes = Self::parse_takes();
         let parse_returns = Self::parse_returns();
-        let macro_body = Self::parse_macro_body();
+
+        let macro_body = Self::nested_parser(
+            Self::parse_macro_body(),
+            Token::OpenBrace,
+            Token::CloseBrace,
+            |span| Vec::new(),
+        );
 
         parse_macro_type
             .then(parse_identifier)
-            .then_ignore(just(Token::OpenParen))
             .then(parse_args)
-            .then_ignore(just(Token::CloseParen))
             .then_ignore(just(Token::Assign))
             .then(parse_takes.or_not())
             .then(parse_returns.or_not())
-            .then_ignore(just(Token::OpenBrace))
             .then(macro_body)
-            .then_ignore(just(Token::CloseBrace))
             // TODO: recover with open and close delimiters
             .map_with_span(
                 |(((((macro_type, name), args), takes), returns), body), span| {
@@ -712,7 +740,7 @@ impl Statement {
             })
     }
 
-    fn extract_codetable() -> impl HParser<String> + Clone {
+    fn extract_code_table() -> impl HParser<String> + Clone {
         let code_from_literal = Self::extract_code_from_literal();
         let code = Self::extract_code();
 
