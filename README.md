@@ -7,7 +7,7 @@
 
 ## Wat do?
 
-Chuff is a huff parser build with [chumsky]("https://github.com/zesterer/chumsky"). A "parser library for humans with powerful error recovery". Using chumsky as a base reduces the effort to build a parser that can recover from errors and reproduce a functional AST, which is essential if you want to show errors across the whole file.
+Chuff is a huff parser build with [chumsky]("https://github.com/zesterer/chumsky"). A "parser library for humans with powerful error recovery". Using chumsky as a base reduces the effort to build a parser that can recover from errors, which is essential to provide as much feedback as possible within an lsp.
 
 ## Why
 
