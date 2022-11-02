@@ -56,7 +56,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         )
         .then_ignore(end());
 
-    newline.or_not().ignore_then(tokens)
+    newline.clone().or_not().ignore_then(tokens)
 }
 
 pub fn lex_operators() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -81,9 +81,9 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|num: String| {
             // work out when to return it as an identifier
             if num.len() < 64 {
-                Token::Literal(str_to_bytes32(&num))
+                return Token::Literal(str_to_bytes32(&num));
             } else {
-                Token::Code(num)
+                return Token::Code(num.clone());
             }
         })
 }
@@ -114,7 +114,7 @@ pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> 
     just('_')
         .ignore_then(just('_'))
         .ignore_then(text::ident())
-        .map(Token::BuiltinFunction)
+        .map(|ident| Token::BuiltinFunction(ident))
 }
 
 pub fn lex_abi_type() -> impl Parser<char, PrimitiveEVMType, Error = Simple<char>> {
@@ -219,7 +219,7 @@ pub fn lex_opcode() -> impl Parser<char, Token, Error = Simple<char>> {
             let is_opcode = OPCODES_MAP.get(&ident);
 
             match is_opcode {
-                Some(opcode) => Token::Opcode(*opcode),
+                Some(opcode) => Token::Opcode(opcode.clone()),
                 None => match ident.as_str() {
                     "macro" => Token::Macro,
                     "calldata" => Token::Calldata,
@@ -283,6 +283,12 @@ pub fn lex_include() -> impl Parser<char, Token, Error = Simple<char>> {
 fn lex_newline_and_comments() -> impl Parser<char, Token, Error = Simple<char>> + Clone {
     let other_whitespace = lex_non_newline_whitespace();
 
+    let multiline_comment = just("/*")
+        .then(take_until(just("*/")))
+        .padded_by(other_whitespace.clone().repeated())
+        .to(())
+        .labelled("multiline_comment");
+
     let comment = just("//")
         .then(take_until(just('\n')))
         .padded_by(other_whitespace.repeated())
@@ -291,6 +297,7 @@ fn lex_newline_and_comments() -> impl Parser<char, Token, Error = Simple<char>> 
 
     text::newline()
         .or(comment)
+        .or(multiline_comment)
         .repeated()
         .at_least(1)
         .to(Token::Newline)
