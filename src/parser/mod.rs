@@ -18,9 +18,6 @@ use crate::{
     },
 };
 
-// Note: Trait generics are in experimental, must use the nightly toolchain
-pub trait HParser<T> = chumsky::Parser<Token, T, Error = Simple<Token>> + Clone;
-
 /// Public entry point to the ast parser
 pub fn parser() -> impl Parser<Token, Vec<Spanned<Ast>>, Error = Simple<Token>> {
     Ast::parser().repeated().at_least(1).then_ignore(end())
@@ -133,11 +130,11 @@ impl Ast {
     /// Utility function for when a smaller parser is enclosed by delimiters, a recovery strategy is automatically implemented based on
     /// the provided delimiters
     fn nested_parser<'a, T: 'a>(
-        parser: impl HParser<T> + 'a,
+        parser: impl Parser<Token, T, Error = Simple<Token>> + Clone + 'a,
         open_delimiter: Token,
         close_delimiter: Token,
         f: impl Fn(Span) -> T + Clone + 'a,
-    ) -> impl HParser<T> + 'a {
+    ) -> impl Parser<Token, T, Error = Simple<Token>> + Clone + 'a {
         parser
             .delimited_by(just(open_delimiter.clone()), just(close_delimiter.clone()))
             .recover_with(nested_delimiters(
@@ -155,7 +152,7 @@ impl Ast {
 
     // Parse high level functions
 
-    fn parse_include() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_include() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let extract_string = Self::extract_string();
 
         just(Token::Include)
@@ -170,7 +167,7 @@ impl Ast {
         // Try and find other define / include tokens in case of failure
     }
 
-    fn parse_define() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_define() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let table_parser = Self::table_parser();
         let macro_parser = Self::parse_macro();
         let constant_parser = Self::parse_constants();
@@ -199,7 +196,7 @@ impl Ast {
         // .or_else(|tok| Ok((Self::ParsingError("Unexpected".to_string()), tok.span())))
     }
 
-    fn parse_errors() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_errors() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let parse_identifier = Self::extract_ident();
         let func_params = Self::parse_abi_inputs();
 
@@ -215,14 +212,14 @@ impl Ast {
     ///
     /// Parses either a jump table or a code table, both are stored as the same root type, TableDefinition
     ///
-    fn table_parser() -> impl HParser<Spanned<Self>> + Clone {
+    fn table_parser() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let jump_table = Self::parse_jump_table();
         let code_table = Self::parse_code_table();
 
         jump_table.or(code_table)
     }
 
-    fn parse_jump_table() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_jump_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let table_kind = Self::parse_jump_table_kind();
         let ident = Self::extract_ident();
         let optional_parens = Self::parse_optional_paren();
@@ -251,20 +248,21 @@ impl Ast {
             })
     }
 
-    fn parse_jump_table_kind() -> impl HParser<TableKind> + Clone {
+    fn parse_jump_table_kind() -> impl Parser<Token, TableKind, Error = Simple<Token>> + Clone {
         just(Token::JumpTable)
             .to(TableKind::JumpTable)
             .or(just(Token::JumpTablePacked).to(TableKind::JumpTablePacked))
     }
 
-    fn parse_optional_paren() -> impl HParser<()> + Clone {
+    fn parse_optional_paren() -> impl Parser<Token, (), Error = Simple<Token>> + Clone {
         just(Token::OpenParen)
             .ignore_then(just(Token::CloseParen))
             .ignore_then(just(Token::Assign))
             .ignored()
     }
 
-    fn parse_jump_table_contents() -> impl HParser<Vec<Spanned<TableStatements>>> + Clone {
+    fn parse_jump_table_contents(
+    ) -> impl Parser<Token, Vec<Spanned<TableStatements>>, Error = Simple<Token>> + Clone {
         let ident = Self::extract_ident();
         let parse_num = Self::extract_number();
         let parse_lit = Self::extract_literal();
@@ -286,7 +284,7 @@ impl Ast {
             .repeated()
     }
 
-    fn parse_code_table() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_code_table() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let extract_code_table_code = Self::extract_code_table();
         let ident = Self::extract_ident();
         let optional_parens = Self::parse_optional_paren();
@@ -316,7 +314,7 @@ impl Ast {
             })
     }
 
-    fn parse_constants() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_constants() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let parse_identifier = Self::extract_ident();
         let constant_value = Self::parse_constant_value();
 
@@ -327,7 +325,8 @@ impl Ast {
             .map_with_span(|(name, value), span| (Self::ConstantDefinition { name, value }, span))
     }
 
-    fn parse_abi_event_definition() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_abi_event_definition(
+    ) -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let event_args = Self::parse_event_inputs();
         let ident = Self::extract_ident();
 
@@ -360,7 +359,7 @@ impl Ast {
             })
     }
 
-    fn parse_abi_definition() -> impl HParser<Spanned<Self>> + Clone {
+    fn parse_abi_definition() -> impl Parser<Token, Spanned<Self>, Error = Simple<Token>> + Clone {
         let parse_identifier = Self::extract_ident();
         let parse_return_types = Self::parse_return_type();
         let parse_visibility = Self::parse_abi_visibility();
@@ -394,7 +393,8 @@ impl Ast {
             })
     }
 
-    fn parse_abi_visibility() -> impl HParser<Spanned<FunctionType>> + Clone {
+    fn parse_abi_visibility(
+    ) -> impl Parser<Token, Spanned<FunctionType>, Error = Simple<Token>> + Clone {
         just(Token::View)
             .map_with_span(|_, span| (FunctionType::View, span))
             .or(just(Token::Payable).map_with_span(|_, span| (FunctionType::Payable, span)))
@@ -402,7 +402,8 @@ impl Ast {
             .or(just(Token::Pure).map_with_span(|_, span| (FunctionType::Pure, span)))
     }
 
-    fn parse_return_type() -> impl HParser<Vec<Spanned<FunctionParam>>> + Clone {
+    fn parse_return_type(
+    ) -> impl Parser<Token, Vec<Spanned<FunctionParam>>, Error = Simple<Token>> + Clone {
         let abi_outputs = Self::nested_parser(
             Self::parse_abi_inputs(),
             Token::OpenParen,
@@ -413,7 +414,7 @@ impl Ast {
         just(Token::Returns).ignore_then(abi_outputs)
     }
 
-    fn parse_parameter_kind() -> impl HParser<String> + Clone {
+    fn parse_parameter_kind() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         just(Token::Memory)
             .map(|_| "memory".to_string())
             .or(just(Token::Storage).map(|_| "storage".to_string()))
@@ -425,7 +426,8 @@ impl Ast {
     ///
     /// This parses a grammar in the following format
     /// (<type> <kind(memory|storage)>? <name>)
-    fn parse_abi_inputs() -> impl HParser<Vec<Spanned<FunctionParam>>> + Clone {
+    fn parse_abi_inputs(
+    ) -> impl Parser<Token, Vec<Spanned<FunctionParam>>, Error = Simple<Token>> + Clone {
         let primitive = Self::extract_primitive();
         let param_kind = Self::parse_parameter_kind();
         let ident = Self::extract_ident();
@@ -452,7 +454,8 @@ impl Ast {
             .repeated()
     }
 
-    fn parse_event_inputs() -> impl HParser<Vec<Spanned<EventParam>>> + Clone {
+    fn parse_event_inputs(
+    ) -> impl Parser<Token, Vec<Spanned<EventParam>>, Error = Simple<Token>> + Clone {
         let primitive = Self::extract_primitive();
         let ident = Self::extract_ident();
 
@@ -617,7 +620,8 @@ impl Ast {
             .repeated()
     }
 
-    fn parse_hex_literal() -> impl HParser<Spanned<MacroBody>> + Clone {
+    fn parse_hex_literal() -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone
+    {
         let get_literal = Self::extract_literal();
 
         get_literal.map_with_span(|lit, span| (MacroBody::HexLiteral(lit), span))
@@ -627,7 +631,7 @@ impl Ast {
     ///
     /// Parses jump labels in the pattern (ident, Option<:>). If the option resolves to have a value
     /// then is it determined that this is a jump location.
-    fn parse_jump_label() -> impl HParser<Spanned<MacroBody>> + Clone {
+    fn parse_jump_label() -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let ident = Self::extract_ident();
 
         ident
@@ -641,7 +645,8 @@ impl Ast {
             })
     }
 
-    fn parse_arg_invocation() -> impl HParser<Spanned<MacroBody>> + Clone {
+    fn parse_arg_invocation(
+    ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let ident = Self::extract_ident();
 
         just(Token::LeftAngle)
@@ -650,7 +655,8 @@ impl Ast {
             .map_with_span(|arg, span| (MacroBody::ArgsInvocation(arg), span))
     }
 
-    fn parse_builtin_invocation() -> impl HParser<Spanned<MacroBody>> + Clone {
+    fn parse_builtin_invocation(
+    ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let builtin_ident = Self::extract_builtin_ident();
         let parse_args = Self::parse_args();
 
@@ -661,7 +667,8 @@ impl Ast {
             .map_with_span(|(name, args), span| (MacroBody::BuiltinInvocation { name, args }, span))
     }
 
-    fn parse_macro_invocation() -> impl HParser<Spanned<MacroBody>> + Clone {
+    fn parse_macro_invocation(
+    ) -> impl Parser<Token, Spanned<MacroBody>, Error = Simple<Token>> + Clone {
         let ident = Self::extract_ident();
         let parse_args = Self::parse_args();
 
@@ -675,39 +682,40 @@ impl Ast {
     // Utility functions to extract data from lexing tokens
 
     /// Parsers to extract nested information from the tokens
-    fn extract_string() -> impl HParser<String> + Clone {
+    fn extract_string() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Str(str) => str }.labelled("string")
     }
 
-    fn extract_ident() -> impl HParser<String> + Clone {
+    fn extract_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Ident(str) => str}.labelled("identifier")
     }
 
-    fn extract_opcode() -> impl HParser<Opcode> + Clone {
+    fn extract_opcode() -> impl Parser<Token, Opcode, Error = Simple<Token>> + Clone {
         select! {Token::Opcode(opcode) => opcode}.labelled("opcode")
     }
 
-    fn extract_builtin_ident() -> impl HParser<String> + Clone {
+    fn extract_builtin_ident() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::BuiltinFunction(name) => name}.labelled("builtin")
     }
 
-    fn extract_literal() -> impl HParser<Literal> + Clone {
+    fn extract_literal() -> impl Parser<Token, Literal, Error = Simple<Token>> + Clone {
         select! { Token::Literal(lit) => lit }.labelled("hex_literal")
     }
 
-    fn extract_number() -> impl HParser<usize> + Clone {
+    fn extract_number() -> impl Parser<Token, usize, Error = Simple<Token>> + Clone {
         select! { Token::Num(val) => val}.labelled("number")
     }
 
     // TODO: handle tuple definitions
-    fn extract_primitive() -> impl HParser<FunctionParamType> + Clone {
+    fn extract_primitive() -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
         let fixed_primitive = Self::extract_fixed_primitive();
         let array_primitive = Self::extract_array_primitive();
 
         fixed_primitive.or(array_primitive)
     }
 
-    fn extract_fixed_primitive() -> impl HParser<FunctionParamType> + Clone {
+    fn extract_fixed_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
         select! {Token::PrimitiveType(prim_type) => prim_type}
             .labelled("primitive_type")
             .map(|token| match token {
@@ -722,7 +730,8 @@ impl Ast {
     }
 
     // TODO: shorten
-    fn extract_array_primitive() -> impl HParser<FunctionParamType> + Clone {
+    fn extract_array_primitive(
+    ) -> impl Parser<Token, FunctionParamType, Error = Simple<Token>> + Clone {
         select! { Token::ArrayType(primitive, array) => (primitive, array)}
             .labelled("array_primitive")
             .map(|(primitive, arr)| match primitive {
@@ -750,18 +759,18 @@ impl Ast {
             })
     }
 
-    fn extract_code_table() -> impl HParser<String> + Clone {
+    fn extract_code_table() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         let code_from_literal = Self::extract_code_from_literal();
         let code = Self::extract_code();
 
         code_from_literal.or(code)
     }
 
-    fn extract_code_from_literal() -> impl HParser<String> + Clone {
+    fn extract_code_from_literal() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Literal(lit) => bytes32_to_string(&lit, false)}.labelled("codetable_code")
     }
 
-    fn extract_code() -> impl HParser<String> + Clone {
+    fn extract_code() -> impl Parser<Token, String, Error = Simple<Token>> + Clone {
         select! { Token::Code(string) => string}.labelled("codetable_code")
     }
 }
