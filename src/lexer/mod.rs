@@ -90,9 +90,9 @@ pub fn lex_literals() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|num: String| {
             // work out when to return it as an identifier
             if num.len() < 64 {
-                return Token::Literal(str_to_bytes32(&num));
+                Token::Literal(str_to_bytes32(&num))
             } else {
-                return Token::Code(num.clone());
+                Token::Code(num.clone())
             }
         })
 }
@@ -131,7 +131,7 @@ pub fn lex_builtin_function() -> impl Parser<char, Token, Error = Simple<char>> 
     just('_')
         .ignore_then(just('_'))
         .ignore_then(text::ident())
-        .map(|ident| Token::BuiltinFunction(ident))
+        .map(Token::BuiltinFunction)
 }
 
 /// Lex ABI Type
@@ -256,7 +256,7 @@ pub fn lex_opcode_or_ident() -> impl Parser<char, Token, Error = Simple<char>> {
             let is_opcode = OPCODES_MAP.get(&ident);
 
             match is_opcode {
-                Some(opcode) => Token::Opcode(opcode.clone()),
+                Some(opcode) => Token::Opcode(*opcode),
                 None => match ident.as_str() {
                     "macro" => Token::Macro,
                     "calldata" => Token::Calldata,
@@ -278,7 +278,6 @@ pub fn lex_opcode_or_ident() -> impl Parser<char, Token, Error = Simple<char>> {
                     "payable" => Token::Payable,
                     "nonpayable" => Token::NonPayable,
                     "view" => Token::View,
-                    "returns" => Token::Returns,
                     "indexed" => Token::Indexed,
 
                     _ => Token::Ident(ident),
