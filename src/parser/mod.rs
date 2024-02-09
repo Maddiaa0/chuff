@@ -94,7 +94,7 @@ pub enum MacroBody {
 
 pub type Args = Vec<Spanned<Arg>>;
 #[derive(Debug, Clone, PartialEq, Hash)]
-enum Arg {
+pub enum Arg {
     Valid(String),
     Invalid,
 }
@@ -271,11 +271,11 @@ impl Ast {
             .map_with_span(|ident, span| (TableStatements::JumpLabel(ident), span))
             .or(parse_num.map_with_span(|num, span| {
                 (
-                    TableStatements::Error("Number not expected".to_string()),
+                    TableStatements::Error(format!("Number not expected: {num}")),
                     span,
                 )
             }))
-            .or(parse_lit.map_with_span(|num, span| {
+            .or(parse_lit.map_with_span(|_literal, span| {
                 (
                     TableStatements::Error("Literal not expected".to_string()),
                     span,
@@ -369,7 +369,7 @@ impl Ast {
             parse_abi_args,
             Token::OpenParen,
             Token::CloseParen,
-            |span| None,
+            |_span| None,
         );
 
         just(Token::Function)
@@ -408,7 +408,7 @@ impl Ast {
             Self::parse_abi_inputs(),
             Token::OpenParen,
             Token::CloseParen,
-            |span| Vec::new(),
+            |_span| Vec::new(),
         );
 
         just(Token::Returns).ignore_then(abi_outputs)
@@ -509,7 +509,7 @@ impl Ast {
             Self::parse_macro_body(),
             Token::OpenBrace,
             Token::CloseBrace,
-            |span| Vec::new(),
+            |_span| Vec::new(),
         );
 
         parse_macro_type
@@ -606,7 +606,7 @@ impl Ast {
             let invalid_keywords = [Token::Macro, Token::Function, Token::Storage];
             invalid_keywords.contains(token)
         })
-        .map_with_span(|token: Token, span| (MacroBody::UnexpectedToken("exp".to_string()), span));
+        .map_with_span(|token: Token, span| (MacroBody::UnexpectedToken(token.to_string()), span));
 
         opcode
             .map_with_span(|tok, span| (MacroBody::Opcode(tok), span))

@@ -278,7 +278,6 @@ pub fn lex_opcode_or_ident() -> impl Parser<char, Token, Error = Simple<char>> {
                     "payable" => Token::Payable,
                     "nonpayable" => Token::NonPayable,
                     "view" => Token::View,
-                    "returns" => Token::Returns,
                     "indexed" => Token::Indexed,
 
                     _ => Token::Ident(ident),

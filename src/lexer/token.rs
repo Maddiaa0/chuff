@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::utils::{opcodes::Opcode, types::PrimitiveEVMType};
 
 pub type Literal = [u8; 32];
@@ -117,4 +119,71 @@ pub enum Token {
     Storage,
 
     Unknown(String),
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::Eof => write!(f, "EOF"),
+            Token::Comment(c) => write!(f, "Comment({})", c),
+            Token::Newline => write!(f, "Newline"),
+            Token::Div => write!(f, "Div"),
+            Token::Define => write!(f, "Define"),
+            Token::Include => write!(f, "Include"),
+            Token::Macro => write!(f, "Macro"),
+            Token::Fn => write!(f, "Fn"),
+            Token::Test => write!(f, "Test"),
+            Token::Function => write!(f, "Function"),
+            Token::Event => write!(f, "Event"),
+            Token::Constant => write!(f, "Constant"),
+            Token::Error => write!(f, "Error"),
+            Token::Takes => write!(f, "Takes"),
+            Token::Returns => write!(f, "Returns"),
+            Token::View => write!(f, "View"),
+            Token::Pure => write!(f, "Pure"),
+            Token::Payable => write!(f, "Payable"),
+            Token::NonPayable => write!(f, "NonPayable"),
+            Token::Indexed => write!(f, "Indexed"),
+            Token::FreeStoragePointer => write!(f, "FreeStoragePointer"),
+            Token::Ident(i) => write!(f, "Ident({})", i),
+            Token::Assign => write!(f, "="),
+            Token::OpenParen => write!(f, "("),
+            Token::CloseParen => write!(f, ")"),
+            Token::OpenBracket => write!(f, "["),
+            Token::CloseBracket => write!(f, "]"),
+            Token::OpenBrace => write!(f, "{{"),
+            Token::CloseBrace => write!(f, "}}"),
+            Token::LeftAngle => write!(f, "<"),
+            Token::RightAngle => write!(f, ">"),
+            Token::Add => write!(f, "Add"),
+            Token::Sub => write!(f, "Sub"),
+            Token::Mul => write!(f, "Mul"),
+            Token::Comma => write!(f, ","),
+            Token::Colon => write!(f, ";"),
+            Token::Pound => write!(f, "#"),
+            Token::Num(n) => write!(f, "Num({})", n),
+            Token::Whitespace => write!(f, "Whitespace"),
+            Token::Str(s) => write!(f, "Str({})", s),
+            Token::Literal(l) => write!(
+                f,
+                "Literal({})",
+                l.iter()
+                    .fold(String::new(), |acc, x| acc + &format!("{:02x}", x))
+            ),
+            Token::Code(c) => write!(f, "Code({})", c),
+            Token::Opcode(o) => write!(f, "Opcode({})", o),
+            Token::Label(l) => write!(f, "Label({})", l),
+            Token::Path(p) => write!(f, "Path({})", p),
+            Token::PrimitiveType(t) => write!(f, "PrimitiveType({})", t),
+            Token::ArrayType(t, d) => write!(f, "ArrayType({}, {:?})", t, d),
+            Token::JumpTable => write!(f, "JumpTable"),
+            Token::JumpTablePacked => write!(f, "JumpTablePacked"),
+            Token::CodeTable => write!(f, "CodeTable"),
+            Token::BuiltinFunction(b) => write!(f, "BuiltinFunction({})", b),
+            Token::Calldata => write!(f, "Calldata"),
+            Token::Memory => write!(f, "Memory"),
+            Token::Storage => write!(f, "Storage"),
+            Token::Unknown(u) => write!(f, "Unknown({})", u),
+        }
+    }
 }
