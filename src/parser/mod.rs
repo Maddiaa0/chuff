@@ -158,7 +158,7 @@ impl Ast {
         just(Token::Include)
             .ignore_then(extract_string.or_else(|_| Ok("____PARSING_ERROR".to_string())))
             .validate(|string, span, emit| {
-                if string == "____PARSING_ERROR".to_string() {
+                if string == *"____PARSING_ERROR" {
                     emit(Simple::custom(span, "Expected string".to_string()))
                 }
                 string
@@ -603,7 +603,7 @@ impl Ast {
             .map_with_span(|num: usize, span| (MacroBody::UnexpectedToken(num.to_string()), span));
         let unexpected_keyword = filter::<Token, _, Simple<Token>>(|token| {
             // TODO: create a vector of keywords invalid inside a macro
-            let invalid_keywords = vec![Token::Macro, Token::Function, Token::Storage];
+            let invalid_keywords = [Token::Macro, Token::Function, Token::Storage];
             invalid_keywords.contains(token)
         })
         .map_with_span(|token: Token, span| (MacroBody::UnexpectedToken("exp".to_string()), span));

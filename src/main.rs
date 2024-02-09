@@ -17,7 +17,7 @@ use chumsky_huff::{
 
 fn main() -> Result<(), String> {
     let file_path = std::env::args().nth(1).unwrap();
-    let src = std::fs::read_to_string(&file_path).unwrap();
+    let src = std::fs::read_to_string(file_path).unwrap();
     let src_len = src.chars().count();
 
     // let eoi = Span::new(file_path, src_len..src_len);
