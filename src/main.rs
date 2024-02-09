@@ -1,5 +1,3 @@
-#![feature(trait_alias)]
-
 // TOOD: look in ast.rs of huff-rs and rip the types so that they can
 // be identical to the ones in the huff-rs crate
 
